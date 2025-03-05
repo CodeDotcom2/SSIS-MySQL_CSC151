@@ -634,9 +634,9 @@ def bind_button_effects(canvas, button_shape, text_id, default_color, hover_colo
     canvas.bind("<Leave>", on_leave)
 
 
-def colleges_func(event=None):
+def colleges_func(event):
     global manage_text,add_college,view_college,add_canvas,view_canvas,add
-    restore_content()
+
     if not is_form_visible: 
         toggle_form()
         frame.config(height=250)
@@ -693,7 +693,7 @@ def colleges_func(event=None):
         bind_button_effects(view_canvas, view, view_college, 
                     default_color="white", hover_color="#1E56A0", click_color="#1B4883",
                     default_text_color="black", hover_text_color="white",
-                    command=view_college_function) 
+                    command=lambda: print("Add clicked")) 
                
         bind_button_effects(close_canvas, close, close_college, 
                     default_color="#AA4141", hover_color="#C75050", click_color="#B22929",
@@ -702,6 +702,7 @@ def colleges_func(event=None):
 
 
 COLLEGE_FILE = "colleges.csv"
+PROGRAM_FILE = "programs.csv"
 college_names = {}
 
 def load_colleges():
@@ -716,29 +717,45 @@ def load_colleges():
             if len(row) == 2:
                 formatted_college = f"{row[0]} - {row[1]}"
                 college_names[formatted_college] = []
+def load_programs():
+    if not os.path.exists(PROGRAM_FILE):
+        return
+    
+    with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
+        reader = csv.reader(file)
+        for row in reader:
+            if len(row) == 3:
+                program_entry = f"{row[0]} - {row[1]}"
+                college_code = row[2]
 
+                for college in college_names.keys():
+                    if college.startswith(college_code): 
+                        college_names[college].append(program_entry)
+                        break  
 def save_college():
-    global college_dropdown, college_names, selected_item_id
+    global college_dropdown, college_names
 
-    college_code_value = course_code.get().strip().upper()
+    college_code_value = course_code.get().strip()
     college_name_value = course_name.get().strip()
 
     if not college_code_value or not college_name_value:
         messagebox.showerror("Input Error", "All fields are required.")
         return
 
-    if not re.fullmatch(r"[A-Z0-9\-]+", college_code_value):
-        messagebox.showerror("Input Error", "College code must contain only uppercase letters, numbers, and dashes.")
+    college_code_value = college_code_value.upper()
+
+    if not re.fullmatch(r"[A-Z]+", college_code_value):
+        messagebox.showerror("Input Error", "College code must contain only letters with no spaces.")
         return
 
-    college_name_value = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in college_name_value.split()])
+    college_name_value = college_name_value.title()
 
-    if not re.fullmatch(r"[A-Za-z0-9\s-]+", college_name_value):
-        messagebox.showerror("Input Error", "College name must contain only letters, numbers, and dashes.")
+    if not re.fullmatch(r"[A-Za-z\s-]+", college_name_value):
+        messagebox.showerror("Input Error", "College name must contain only letters and dashes.")
         return
 
-    if len(college_code_value) > 20:
-        messagebox.showerror("Input Error", "College code must not exceed 20 characters.")
+    if len(college_code_value) > 10:
+        messagebox.showerror("Input Error", "College code must not exceed 10 characters.")
         return
 
     if len(college_name_value) > 100:
@@ -754,20 +771,9 @@ def save_college():
     college_names[formatted_college] = []
 
     try:
-        # Read existing data
-        colleges_data = []
-        with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            colleges_data = list(reader)
-
-        # Add new college
-        colleges_data.append([college_code_value, college_name_value])
-
-        # Write data back to file
-        with open(COLLEGE_FILE, mode='w', newline='', encoding='utf-8') as file:
+        with open(COLLEGE_FILE, mode='a', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
-            writer.writerows(colleges_data)
-
+            writer.writerow([college_code_value, college_name_value])
     except Exception as e:
         messagebox.showerror("File Error", f"An error occurred while saving: {e}")
         return
@@ -786,9 +792,9 @@ def save_college():
     course_code.delete(0, "end")
     course_code.insert(0, "Ex: CCS")
     course_code.config(fg="gray", justify="center")
-    
+
 def add_college_function(event=None):
-    global course_code,course_name,save_canvas,save_button,save_text,manage_text,back_canvas2
+    global course_code,course_name
 
     restore_content()
     side_bar_canvas.itemconfig(add_button, fill='#D7E3F5')  
@@ -804,26 +810,6 @@ def add_college_function(event=None):
             else: 
                 widget.destroy()  
         side_bar_canvas.configure(bg="lightgray")
-
-        global back_icon
-        back_icon = PhotoImage(file="Images/back.png")
-
-        back_canvas2 = Canvas(root, width=30, height=30, bg="lightgray", highlightthickness=0)
-        image_id = back_canvas2.create_image(15, 15, image=back_icon, anchor="center")
-
-        frame.create_window(20, 25, window=back_canvas2)
-        form_widgets.append(back_canvas2)
-        def on_hover(event):
-    
-            overlapping = back_canvas2.find_overlapping(event.x, event.y, event.x, event.y)
-            if image_id in overlapping:
-                back_canvas2.config(cursor="hand2")  
-            else:
-                back_canvas2.config(cursor="")
-
-        back_canvas2.bind("<Button-1>", colleges_func)
-        back_canvas2.bind("<Motion>", on_hover)
-        back_canvas2.bind("<Leave>", lambda event: back_canvas2.config(cursor=""))
 
         colleges_frame = create_rounded_rectangle(frame, -300, 0, 350, 250, radius=130, fill='lightgray')
         form_widgets.append(colleges_frame)
@@ -856,7 +842,7 @@ def add_college_function(event=None):
         frame.create_window(175,160,window=course_text)
         form_widgets.append(course_text)
 
-        course_code = Entry(root, font=('Albert Sans', 12, 'normal'),width=30, fg="gray",justify="center")
+        course_code = Entry(root, font=('Albert Sans', 12, 'normal'),width=14, fg="gray",justify="center")
         frame.create_window(175,140,window=course_code)
         form_widgets.append(course_code)
         course_code.insert(0, "Ex: CCS")
@@ -890,498 +876,78 @@ def add_college_function(event=None):
                             default_text_color="white", hover_text_color="white",
                             command=save_college)
 
-selected_item_id = None
-def edit_college():
-    global selected_item_id, course_code, course_name, manage_text
-
-    selected_item = college_table.selection()  
-    if not selected_item:  
-        messagebox.showwarning("Warning", "Please select a college to edit!")
-        return
-    
-    selected_item_id = selected_item[0]
-
-    values = college_table.item(selected_item, "values") 
-    if len(values) < 2:
-        messagebox.showerror("Error", "Unable to retrieve college details.")
-        return 
-
-    colleges_code, colleges_name = values[0], values[1]  
-
-    add_college_function()  
-    back_canvas2.unbind("<Button-1>")
-    back_canvas2.bind("<Button-1>", view_college_function)
-
-    manage_text.configure(text="Edit College")
-    course_code.delete(0, END)
-    course_code.insert(0, colleges_code)
-    course_code.config(fg="black", justify="left")
-
-    course_name.delete(0, END)
-    course_name.insert(0, colleges_name)
-    course_name.config(fg="black", justify="left")
-
-    def update_college():
-        new_college_code = course_code.get().strip().upper()
-        new_college_name = course_name.get().strip()
-
-        if not new_college_code or not new_college_name:
-            messagebox.showerror("Input Error", "All fields are required.")
-            return
-
-        if not re.fullmatch(r"[A-Z0-9\-]+", new_college_code):
-            messagebox.showerror("Input Error", "College code must contain only uppercase letters, numbers, and dashes.")
-            return
-
-        new_college_name = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in new_college_name.split()])
-
-        if not re.fullmatch(r"[A-Za-z0-9\s-]+", new_college_name):
-            messagebox.showerror("Input Error", "College name must contain only letters, numbers, and dashes.")
-            return
-
-        if len(new_college_code) > 20:
-            messagebox.showerror("Input Error", "College code must not exceed 20 characters.")
-            return
-
-        if len(new_college_name) > 100:
-            messagebox.showerror("Input Error", "College name must not exceed 100 characters.")
-            return
-
-        confirm = messagebox.askyesno("Confirm Update", f"Update college {colleges_code} to {new_college_code}?")
-        if not confirm:
-            return
-
-        new_formatted_college = f"{new_college_code} - {new_college_name}"
-
-        if new_formatted_college != f"{colleges_code} - {colleges_name}" and new_formatted_college in college_names:
-            messagebox.showinfo("Duplicate Entry", "This college already exists.")
-            return
-
-        try:
-            # Read existing colleges
-            colleges_data = []
-            with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                colleges_data = list(reader)
-                
-                # Find and replace the old college with the new one
-                for i, row in enumerate(colleges_data):
-                    if row[0] == colleges_code and row[1] == colleges_name:
-                        colleges_data[i] = [new_college_code, new_college_name]
-                        break
-
-            # Write updated data back to file
-            with open(COLLEGE_FILE, mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerows(colleges_data)
-
-            # Rest of the existing update code remains the same
-            if os.path.exists(PROGRAM_FILE):
-                programs_data = []
-                with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-                    reader = csv.reader(file)
-                    program_headers = next(reader)
-                    for row in reader:
-                        if row[2] == colleges_code:
-                            row[2] = new_college_code
-                        programs_data.append(row)
-
-                with open(PROGRAM_FILE, mode='w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(program_headers)
-                    writer.writerows(programs_data)
-
-            if os.path.exists("students.csv"):
-                students_data = []
-                with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                    reader = csv.reader(file)
-                    students_headers = next(reader)
-                    for row in reader:
-                        if len(row) > 5 and row[5].startswith(f"{colleges_code} - "):
-                            row[5] = f"{new_college_code} - {new_college_name}"
-                        students_data.append(row)
-
-                with open("students.csv", mode='w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(students_headers)
-                    writer.writerows(students_data)
-
-            del college_names[f"{colleges_code} - {colleges_name}"]
-            college_names[new_formatted_college] = []
-
-            if 'college_dropdown' in globals() and college_dropdown.winfo_exists():
-                college_dropdown["values"] = list(college_names.keys())
-
-            view_college_function()
-            load_programs()
-            display_students()
-
-            messagebox.showinfo("Success", "College information updated successfully!")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"An error occurred while updating: {e}")
-            import traceback
-            traceback.print_exc()
-    bind_button_effects(save_canvas, save_button, save_text, 
-                        default_color="#2363C6", hover_color="#2E5EB5", click_color="#1B3A7E",
-                        default_text_color="white", hover_text_color="white",
-                        command=update_college)
-    
-def delete_college(event=None):
-    selected_item = college_table.selection()  
-    if not selected_item:  
-        messagebox.showwarning("Warning", "Please select a college to delete!")
-        return
-    
-    values = college_table.item(selected_item, "values") 
-    if len(values) < 2:
-        messagebox.showerror("Error", "Unable to retrieve college details.")
-        return 
-
-    colleges_code, colleges_name = values[0], values[1]
-
-    confirm = messagebox.askyesno("Confirm Deletion", 
-        f"Are you sure you want to delete the college?\n\n"
-        f"College Code: {colleges_code}\n"
-        f"College Name: {colleges_name}")
-    
-    if not confirm:
-        return
-
-    try:
-        with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            headers = next(reader)  
-            rows = list(reader)
-
-        modified_college_rows = [row for row in rows if not (row[0] == colleges_code and row[1] == colleges_name)]
-
-        with open(COLLEGE_FILE, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(headers)
-            writer.writerows(modified_college_rows)
-
-        if os.path.exists(PROGRAM_FILE):
-            with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                headers = next(reader)
-                rows = list(reader)
-
-            modified_program_rows = [row for row in rows if row[2] != colleges_code]
-
-            with open(PROGRAM_FILE, mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerow(headers)
-                writer.writerows(modified_program_rows)
-
-        if os.path.exists("students.csv"):
-            with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                headers = next(reader)
-                rows = list(reader)
-
-            for row in rows:
-                if len(row) > 5 and row[5].startswith(f"{colleges_code} - "):
-                    row[5] = "N/A"
-                    row[6] = "N/A"
-
-            with open("students.csv", mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerow(headers)
-                writer.writerows(rows)
-
-        formatted_college = f"{colleges_code} - {colleges_name}"
-        if formatted_college in college_names:
-            del college_names[formatted_college]
-
-        view_college_function()
-        load_programs()
-        display_students()
-
-        messagebox.showinfo("Success", f"College {colleges_code} and its programs deleted successfully!")
-
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred while deleting: {e}")
-        import traceback
-        traceback.print_exc()       
-
-def view_college_function(event=None):
-    global college_table,view
-    restore_content()
-
-    side_bar_canvas.itemconfig(add_button, fill='#D7E3F5')  
-    side_bar_canvas.itemconfig(add_text, fill='#154BA6')
-    
-    if not is_form_visible: 
-        toggle_form()
-        frame.config(height=450, width=700)
-        frame.grid()
-
-        for widget in form_widgets:
-            if isinstance(widget, int):  
-                if frame.type(widget) != "text" and frame.type(widget) != "rectangle":  
-                    frame.delete(widget)  
-            else: 
-                widget.destroy()  
-
-        global back_icon
-        back_icon = PhotoImage(file="Images/back.png")
-
-        back_canvas = Canvas(root, width=30, height=30, bg="lightgray", highlightthickness=0)
-        image_id = back_canvas.create_image(15, 15, image=back_icon, anchor="center")
-
-        frame.create_window(20, 25, window=back_canvas)
-        form_widgets.append(back_canvas)
-        def on_hover(event):
-    
-            overlapping = back_canvas.find_overlapping(event.x, event.y, event.x, event.y)
-            if image_id in overlapping:
-                back_canvas.config(cursor="hand2")  
-            else:
-                back_canvas.config(cursor="")
-
-        back_canvas.bind("<Button-1>", colleges_func)
-        back_canvas.bind("<Motion>", on_hover)
-        back_canvas.bind("<Leave>", lambda event: back_canvas.config(cursor=""))
-
-        side_bar_canvas.configure(bg="lightgray")
-
-        all_colleges_frame = create_rounded_rectangle(frame, -300, 0, 700, 450, radius=130, fill='lightgray')
-        form_widgets.append(all_colleges_frame)
-        
-        view = Label(root, text="Colleges", font=("Arial", 25, "bold"), bg="lightgray", fg="#2363C6")
-        frame.create_window(350, 30, window=view)
-        form_widgets.append(view)
-
-        style = ttk.Style()
-        style.configure("Custom.Treeview", background="white", foreground="black", rowheight=25, fieldbackground="white")
-        style.configure("Custom.Treeview.Heading", background="white", foreground="black", font=("Arial", 12, "bold"), relief="relief")  
-        style.map("Custom.Treeview", background=[("selected", "#2E5EB5")]) 
-
-        columns = ("#1", "#2", "#3")
-        college_table = ttk.Treeview(root, style="Custom.Treeview", columns=columns, show="headings", height=7)
-        college_table.heading("#1", text="College Code")
-        college_table.heading("#2", text="College Name")
-        college_table.heading("#3", text="Num. of Programs")
-
-        college_table.column("#1", width=150, anchor="w")
-        college_table.column("#2", width=350, anchor="w")
-        college_table.column("#3", width=155, anchor="center")
-
-        college_table.tag_configure("hover", background="#C5D5F0")
-        def disable_column_drag(event):
-            region = college_table.identify_region(event.x, event.y)
-            if region == "separator" or region == "heading":
-                return "break"
-
-        college_table.bind('<Button-1>', disable_column_drag, add='+')
-        college_table.bind('<B1-Motion>', disable_column_drag, add='+')
-
-        original_colors = {} 
-        try:
-            with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                for row in reader:
-                    if row and len(row) >= 2:
-                        formatted_college = f"{row[0]} - {row[1]}"
-                        program_count = len(college_names.get(formatted_college, []))
-                        row_id = college_table.insert("", "end", values=(row[0], row[1], program_count), tags=("normal",))
-                        original_colors[row_id] = "normal"
-        except FileNotFoundError:
-            print(f"College file {COLLEGE_FILE} not found.")
-        except Exception as e:
-            print(f"Error reading college file: {e}")
-
-        frame.create_window(350, 170, window=college_table)
-        form_widgets.append(college_table)
-
-        hovered_row = None 
-
-        def on_hover(event):
-            nonlocal hovered_row
-            row_id = college_table.identify_row(event.y)
-            
-            if row_id and row_id != hovered_row:
-                if hovered_row and hovered_row in original_colors:
-                    college_table.item(hovered_row, tags=(original_colors[hovered_row],))
-                
-                hovered_row = row_id
-                if row_id in original_colors:
-                    college_table.item(row_id, tags=("hover",))
-
-        def on_leave(event):
-            nonlocal hovered_row
-            if hovered_row and hovered_row in original_colors:
-                college_table.item(hovered_row, tags=(original_colors[hovered_row],)) 
-            hovered_row = None
-
-        college_table.bind("<Motion>", on_hover)
-        college_table.bind("<Leave>", on_leave)
-
-        edit_canvas = Canvas(root, width=100, height=30, bg="lightgray", highlightthickness=0)
-        frame.create_window(75, 300, window=edit_canvas)
-        form_widgets.append(edit_canvas)
-
-        edit_button = create_rounded_rectangle(edit_canvas, 5, 5, 100, 30, radius=20, fill='#2363C6')
-        form_widgets.append(edit_button)
-        edit_text = edit_canvas.create_text(50, 17, text="Edit", fill="white", font=("Arial", 12, "bold"))
-
-        delete_canvas = Canvas(root, width=100, height=30, bg="lightgray", highlightthickness=0)
-        frame.create_window(175, 300, window=delete_canvas)
-        form_widgets.append(delete_canvas)
-
-        delete = create_rounded_rectangle(delete_canvas, 5, 5, 100, 30, radius=20, fill='#AA4141')
-        form_widgets.append(delete)
-        delete_text = delete_canvas.create_text(50, 17, text="Delete", fill="white", font=("Arial", 12, "bold")) 
-
-        close_canvas = Canvas(root, width=100, height=45, bg="lightgray", highlightthickness=0)
-        frame.create_window(350, 400, window=close_canvas)
-        form_widgets.append(close_canvas)
-
-        close = create_rounded_rectangle(close_canvas, 5, 5, 100, 45, radius=20, fill='#AA4141')
-        form_widgets.append(close)
-        close_college = close_canvas.create_text(50, 24, text="Close", fill="white", font=("Arial", 15, "bold"))        
-
-        bind_button_effects(close_canvas, close, close_college, 
-                    default_color="#AA4141", hover_color="#C75050", click_color="#B22929",
-                    default_text_color="white", hover_text_color="white",
-                    command=restore_content) 
-
-        bind_button_effects(delete_canvas, delete, delete_text, 
-                    default_color="#AA4141", hover_color="#C75050", click_color="#B22929",
-                    default_text_color="white", hover_text_color="white",
-                    command=delete_college)   
-        
-        bind_button_effects(edit_canvas, edit_button, edit_text, 
-                            default_color="#2363C6", hover_color="#2E5EB5", click_color="#1B3A7E",
-                            default_text_color="white", hover_text_color="white",
-                            command=edit_college)    
-
 
 def programs_func(event):
-    global manage_text, add_college, view_college, add_canvas, view_canvas, add, view
     colleges_func(event)
     manage_text.config(text="Manage Programs")
     add_canvas.itemconfig(add_college, text="Add Programs")
-
-    view = create_rounded_rectangle(view_canvas, 5, 5, 180, 45, radius=20, fill='white')
-    form_widgets.append(view)
-    view_college = view_canvas.create_text(92, 25, text="View Programs", fill="black", font=("Arial", 15, "bold"))
-
+    view_canvas.itemconfig(view_college,text="View Programs")
     bind_button_effects(add_canvas, add, add_college, 
             default_color="white", hover_color="#1E56A0", click_color="#1B4883",
             default_text_color="black", hover_text_color="white",
             command=add_program_function)
     
-    bind_button_effects(view_canvas, view, view_college, 
-            default_color="white", hover_color="#1E56A0", click_color="#1B4883",
-            default_text_color="black", hover_text_color="white",
-            command=view_programs_function)
-
-
-PROGRAM_FILE = "programs.csv"
-
-
-def load_programs():
-    for college in college_names.keys():
-        college_names[college] = []
-
-    if not os.path.exists(PROGRAM_FILE):
-        return
     
-    try:
-        with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            
-            try:
-                headers = next(reader)
-            except StopIteration:
-                return
 
-            if not headers:
-                return
-
-            for row in reader:
-                if len(row) >= 3:
-                    program_code, program_name, college_code = row[0], row[1], row[2]
-                    program_entry = f"{program_code} - {program_name}"
-
-                    for college in college_names.keys():
-                        if college.startswith(college_code): 
-                            college_names[college].append(program_entry)
-                            break
-    except Exception as e:
-        print(f"Error loading programs: {e}")
-        messagebox.showerror("Error", f"Could not load programs: {e}")
 
 def save_program():
-    global program_name, program_code, program_dropdown
-    selected_college = program_dropdown.get()
+    selected_college = dropdown.get()
+    
     if selected_college == "Select College First":
         messagebox.showerror("Error", "Please select a college before saving.")
-        return 
+        return
 
-    program_name_value = program_name.get().strip()
-    program_code_value = program_code.get().strip().upper()
+    program_name_value = course_name.get().strip()
+    program_code_value = course_code.get().strip().upper()
 
     if not program_name_value or program_name_value == "Ex: Bachelor of Science in Computer Science":
         messagebox.showerror("Error", "Please enter a valid program name.")
-        return 
+        return
 
     if not program_code_value or program_code_value == "Ex: BSCS":
         messagebox.showerror("Error", "Please enter a valid program code.")
-        return 
+        return
 
     if not re.fullmatch(r"[A-Z0-9\-]+", program_code_value):
         messagebox.showerror("Input Error", "Program code must contain only uppercase letters, numbers, and dashes.")
-        return 
+        return
 
     program_name_value = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in program_name_value.split()])
 
     if not re.fullmatch(r"[A-Za-z0-9\s-]+", program_name_value):
         messagebox.showerror("Input Error", "Program name must contain only letters, numbers, and dashes.")
-        return 
+        return
 
     college_code = selected_college.split(" - ")[0]
-    headers_exist = False
-    existing_programs = set()
 
+    existing_programs = set()
     if os.path.exists(PROGRAM_FILE):
         with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.reader(file)
-            try:
-                headers = next(reader)
-                headers_exist = True
-                for row in reader:
-                    if len(row) >= 3:
-                        existing_programs.add((row[0].upper(), row[2]))
-            except StopIteration:
-                pass
+            for row in reader:
+                if len(row) >= 3:
+                    existing_programs.add((row[0].upper(), row[2]))
 
     if (program_code_value, college_code) in existing_programs:
         messagebox.showwarning("Duplicate", f"Program '{program_name_value}' already exists under {selected_college}.")
-        return 
+        return
 
     with open(PROGRAM_FILE, mode='a', newline='', encoding='utf-8') as file:
         writer = csv.writer(file)
-        if not headers_exist:
-            writer.writerow(['Program Code', 'Program Name', 'College Code'])
         writer.writerow([program_code_value, program_name_value, college_code])
 
-    load_programs()
     messagebox.showinfo("Success", f"Program '{program_name_value}' saved under {selected_college}!")
-    
-    program_dropdown.set("Select College First")
-    program_name.delete(0, END)
-    program_name.insert(0, "Ex: Bachelor of Science in Computer Science")
-    program_name.config(fg="gray", justify="center")
 
-    program_code.delete(0, END)
-    program_code.insert(0, "Ex: BSCS")
-    program_code.config(fg="gray", justify="center")
+    course_name.delete(0, END)
+    course_name.insert(0, "Ex: Bachelor of Science in Computer Science")
+    course_name.config(fg="gray", justify="center")
+
+    course_code.delete(0, END)
+    course_code.insert(0, "Ex: BSCS")
+    course_code.config(fg="gray", justify="center")
 
 def add_program_function(event=None):
-    global program_dropdown,program_code,program_name,manage_text2,save_canvas2,save_button2,save_text2,back_canvas
+    global dropdown,course_code,course_name
 
     restore_content()
     side_bar_canvas.itemconfig(add_button, fill='#D7E3F5')  
@@ -1400,55 +966,55 @@ def add_program_function(event=None):
 
         colleges_frame = create_rounded_rectangle(frame, -300, 0, 350, 300, radius=130, fill='lightgray')
         form_widgets.append(colleges_frame)
-        manage_text2 = Label(root, text="Add Program", font=("Arial", 25, "bold"), bg="lightgray", fg="#2363C6")
-        frame.create_window(175, 30, window=manage_text2)
-        form_widgets.append(manage_text2)
+        manage_text = Label(root, text="Add Program", font=("Arial", 25, "bold"), bg="lightgray", fg="#2363C6")
+        frame.create_window(175, 30, window=manage_text)
+        form_widgets.append(manage_text)
 
         
         style = ttk.Style()
         style.configure("Custom.TCombobox", foreground="") 
         style.configure("Custom.TCombobox",relief="flat",foreground="gray")
 
-        program_text = Label(root, text="Program Information ", bg="lightgray", fg="black", font=("Arial", 15,"bold"))
-        frame.create_window(130,70,window=program_text)
-        form_widgets.append(program_text)
+        course_code_text = Label(root, text="Program Information ", bg="lightgray", fg="black", font=("Arial", 15,"bold"))
+        frame.create_window(130,70,window=course_code_text)
+        form_widgets.append(course_code_text)
 
 
-        program_dropdown = ttk.Combobox(root, style="Custom.TCombobox", values=list(college_names.keys()), state="readonly", width=35, font=('Arial', 11, 'normal'))
-        frame.create_window(175, 100, window=program_dropdown)
-        form_widgets.append(program_dropdown)
-        program_dropdown.set("Select College First") 
-        program_dropdown.bind("<<ComboboxSelected>>", on_select)
+        dropdown = ttk.Combobox(root, style="Custom.TCombobox", values=list(college_names.keys()), state="readonly", width=35, font=('Arial', 11, 'normal'))
+        frame.create_window(175, 100, window=dropdown)
+        form_widgets.append(dropdown)
+        dropdown.set("Select College First") 
+        dropdown.bind("<<ComboboxSelected>>", on_select)
 
-        program = Label(root, text="Program Name ", bg="lightgray", fg="gray", font=("Arial", 10))
-        frame.create_window(175,155,window=program)
-        form_widgets.append(program)
-
-        program_name = Entry(root, font=('Albert Sans', 12, 'normal'),width=33, fg="gray",justify="center")
-        frame.create_window(175,135,window=program_name)
+        program_name = Label(root, text="Program Name ", bg="lightgray", fg="gray", font=("Arial", 10))
+        frame.create_window(175,155,window=program_name)
         form_widgets.append(program_name)
-        program_name.insert(0, "Ex: Bachelor of Science in Computer Science")
-        program_name.bind("<FocusIn>", lambda event: program_name.get() == "Ex: Bachelor of Science in Computer Science" and (program_name.delete(0, END), program_name.config(fg="black",justify="left")))
-        program_name.bind("<FocusOut>", lambda event: program_name.get() == "" and (program_name.insert(0, "Ex: Bachelor of Science in Computer Science"), program_name.config(fg="gray",justify="center")))
 
-        program_code_text = Label(root, text="Program Code ", bg="lightgray", fg="gray", font=("Arial", 10))
-        frame.create_window(175,200,window=program_code_text)
-        form_widgets.append(program_code_text)
+        course_name = Entry(root, font=('Albert Sans', 12, 'normal'),width=30, fg="gray",justify="center")
+        frame.create_window(175,135,window=course_name)
+        form_widgets.append(course_name)
+        course_name.insert(0, "Ex: Bachelor of Science in Computer Science")
+        course_name.bind("<FocusIn>", lambda event: course_name.get() == "Ex: Bachelor of Science in Computer Science" and (course_name.delete(0, END), course_name.config(fg="black",justify="left")))
+        course_name.bind("<FocusOut>", lambda event: course_name.get() == "" and (course_name.insert(0, "Ex: Bachelor of Science in Computer Science"), course_name.config(fg="gray",justify="center")))
 
-        program_code = Entry(root, font=('Albert Sans', 12, 'normal'),width=33, fg="gray",justify="center")
-        frame.create_window(175,180,window=program_code)
+        program_code = Label(root, text="Program Code ", bg="lightgray", fg="gray", font=("Arial", 10))
+        frame.create_window(175,200,window=program_code)
         form_widgets.append(program_code)
-        program_code.insert(0, "Ex: BSCS")
-        program_code.bind("<FocusIn>", lambda event: program_code.get() == "Ex: BSCS" and (program_code.delete(0, END), program_code.config(fg="black",justify="left")))
-        program_code.bind("<FocusOut>", lambda event: program_code.get() == "" and (program_code.insert(0, "Ex: BSCS"), program_code.config(fg="gray",justify="center")))
 
-        save_canvas2 = Canvas(root, width=100, height=45, bg="lightgray", highlightthickness=0)
-        frame.create_window(120, 260, window=save_canvas2)
-        form_widgets.append(save_canvas2)
+        course_code = Entry(root, font=('Albert Sans', 12, 'normal'),width=15, fg="gray",justify="center")
+        frame.create_window(175,180,window=course_code)
+        form_widgets.append(course_code)
+        course_code.insert(0, "Ex: BSCS")
+        course_code.bind("<FocusIn>", lambda event: course_code.get() == "Ex: BSCS" and (course_code.delete(0, END), course_code.config(fg="black",justify="left")))
+        course_code.bind("<FocusOut>", lambda event: course_code.get() == "" and (course_code.insert(0, "Ex: BSCS"), course_code.config(fg="gray",justify="center")))
 
-        save_button2 = create_rounded_rectangle(save_canvas2, 5, 5, 100, 45, radius=20, fill='#2363C6')
-        form_widgets.append(save_button2)
-        save_text2 = save_canvas2.create_text(50, 24, text="Save", fill="white", font=("Arial", 15, "bold"))
+        save_canvas = Canvas(root, width=100, height=45, bg="lightgray", highlightthickness=0)
+        frame.create_window(120, 260, window=save_canvas)
+        form_widgets.append(save_canvas)
+
+        save_button = create_rounded_rectangle(save_canvas, 5, 5, 100, 45, radius=20, fill='#2363C6')
+        form_widgets.append(save_button)
+        save_text = save_canvas.create_text(50, 24, text="Save", fill="white", font=("Arial", 15, "bold"))
 
         close_canvas = Canvas(root, width=100, height=45, bg="lightgray", highlightthickness=0)
         frame.create_window(225, 260, window=close_canvas)
@@ -1458,398 +1024,15 @@ def add_program_function(event=None):
         form_widgets.append(close)
         close_college = close_canvas.create_text(50, 24, text="Close", fill="white", font=("Arial", 15, "bold"))        
 
-        global back_icon
-        back_icon = PhotoImage(file="Images/back.png")
-
-        back_canvas = Canvas(root, width=30, height=30, bg="lightgray", highlightthickness=0)
-        image_id = back_canvas.create_image(15, 15, image=back_icon, anchor="center")
-
-        frame.create_window(20, 25, window=back_canvas)
-        form_widgets.append(back_canvas)
-        def on_hover(event):
-    
-            overlapping = back_canvas.find_overlapping(event.x, event.y, event.x, event.y)
-            if image_id in overlapping:
-                back_canvas.config(cursor="hand2")  
-            else:
-                back_canvas.config(cursor="")
-
-        back_canvas.bind("<Button-1>", programs_func)
-        back_canvas.bind("<Motion>", on_hover)
-
-        back_canvas.bind("<Leave>", lambda event: back_canvas.config(cursor=""))
         bind_button_effects(close_canvas, close, close_college, 
                     default_color="#AA4141", hover_color="#C75050", click_color="#B22929",
                     default_text_color="white", hover_text_color="white",
                     command=restore_content)   
         
-        bind_button_effects(save_canvas2, save_button2, save_text2, 
+        bind_button_effects(save_canvas, save_button, save_text, 
                             default_color="#2363C6", hover_color="#2E5EB5", click_color="#1B3A7E",
                             default_text_color="white", hover_text_color="white",
                             command=save_program)
-
-def edit_program():
-    global selected_item_id, program_code, program_name, manage_text2
-
-    selected_item = program_table.selection()  
-    if not selected_item:  
-        messagebox.showwarning("Warning", "Please select a program to edit!")
-        return
-    
-    selected_item_id = selected_item[0]
-
-    values = program_table.item(selected_item, "values") 
-    if len(values) < 3:
-        messagebox.showerror("Error", "Unable to retrieve program details.")
-        return 
-
-    old_program_code, old_program_name, old_college_name = values[0], values[1], values[2]
-
-    add_program_function()  
-    manage_text2.configure(text="Edit Program")
-    back_canvas.unbind("<Button-1>")
-    back_canvas.bind("<Button-1>", view_programs_function)
-
-    for college in college_names.keys():
-        if college.startswith(old_college_name.split(" - ")[0]):
-            program_dropdown.set(college)
-            program_dropdown.event_generate("<<ComboboxSelected>>")
-            break
-
-    program_code.delete(0, END)
-    program_code.insert(0, old_program_code)
-    program_code.config(fg="black", justify="left")
-
-    program_name.delete(0, END)
-    program_name.insert(0, old_program_name)
-    program_name.config(fg="black", justify="left")
-
-    def update_program():
-        new_program_code = program_code.get().strip().upper()
-        new_program_name = program_name.get().strip()
-        selected_college = program_dropdown.get()
-
-        if not new_program_code or not new_program_name:
-            messagebox.showerror("Input Error", "All fields are required.")
-            return
-
-        if not re.fullmatch(r"[A-Z0-9\-]+", new_program_code):
-            messagebox.showerror("Input Error", "Program code must contain only uppercase letters, numbers, and dashes.")
-            return
-
-        new_program_name = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in new_program_name.split()])
-
-        if not re.fullmatch(r"[A-Za-z0-9\s-]+", new_program_name):
-            messagebox.showerror("Input Error", "Program name must contain only letters, numbers, and dashes.")
-            return
-
-        new_college_code = selected_college.split(" - ")[0]
-        old_college_code = old_college_name.split(" - ")[0]
-
-        confirm = messagebox.askyesno("Confirm Update", f"Update program {old_program_code} to {new_program_code}?")
-        if not confirm:
-            return
-
-        try:
-            # Read and update programs file
-            programs_data = []
-            program_headers = None
-
-            with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                program_headers = next(reader)
-                
-                for row in reader:
-                    if row[0] == old_program_code and row[2] == old_college_code:
-                        programs_data.append([new_program_code, new_program_name, new_college_code])
-                    else:
-                        programs_data.append(row)
-
-            with open(PROGRAM_FILE, mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerow(program_headers)
-                writer.writerows(programs_data)
-
-            # Update students file if it exists
-            if os.path.exists("students.csv"):
-                students_data = []
-                students_headers = None
-                with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                    reader = csv.reader(file)
-                    students_headers = next(reader)
-                    for row in reader:
-                        if len(row) > 6 and row[6] == f"{old_program_code} - {old_program_name}":
-                            row[6] = f"{new_program_code} - {new_program_name}"  # Update full program name
-                        students_data.append(row)
-
-                with open("students.csv", mode='w', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow(students_headers)
-                    writer.writerows(students_data)
-
-            old_program_entry = f"{old_program_code} - {old_program_name}"
-            new_program_entry = f"{new_program_code} - {new_program_name}"
-
-            for college, programs in college_names.items():
-                if old_program_entry in programs:
-                    programs.remove(old_program_entry)
-                    programs.append(new_program_entry)
-                    break
-
-            view_programs_function()
-            display_students()
-
-            messagebox.showinfo("Success", "Program information updated successfully!")
-
-        except Exception as e:
-            messagebox.showerror("Error", f"An error occurred while updating: {e}")
-            import traceback
-            traceback.print_exc() 
-
-    bind_button_effects(save_canvas2, save_button2, save_text2, 
-                        default_color="#2363C6", hover_color="#2E5EB5", click_color="#1B3A7E",
-                        default_text_color="white", hover_text_color="white",
-                        command=update_program)
-
-def delete_program(event=None):
-    selected_item = program_table.selection()  
-    if not selected_item:  
-        messagebox.showwarning("Warning", "Please select a program to delete!")
-        return
-    
-    values = program_table.item(selected_item, "values") 
-    if len(values) < 3:
-        messagebox.showerror("Error", "Unable to retrieve program details.")
-        return 
-
-    program_code, program_name, college_code = values[0], values[1], values[2]
-
-    confirm = messagebox.askyesno(
-        "Confirm Deletion", 
-        f"Are you sure you want to delete the program?\n\n"
-        f"Program Code: {program_code}\n"
-        f"Program Name: {program_name}\n"
-        f"College Code: {college_code}"
-    )
-    
-    if not confirm:
-        return
-
-    try:
-        students_using_program = False
-
-        if os.path.exists("students.csv"):
-            with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader)  
-                for row in reader:
-                    if len(row) > 6 and row[6] == f"{program_code} - {program_name}":
-                        students_using_program = True
-                        break
-
-        if students_using_program:
-            students_data = []
-            with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                students_headers = next(reader)
-                for row in reader:
-                    if len(row) > 6 and row[6] == f"{program_code} - {program_name}":
-                        row[6] = 'N/A' 
-                    students_data.append(row)
-
-            with open("students.csv", mode='w', newline='', encoding='utf-8') as file:
-                writer = csv.writer(file)
-                writer.writerow(students_headers)
-                writer.writerows(students_data)
-
-            messagebox.showinfo("Success", f"Program {program_code} updated to 'N/A' for students still enrolled in it.")
-
-        programs_data = []
-        with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-            reader = csv.reader(file)
-            headers = next(reader)
-            for row in reader:
-                if not (row[0] == program_code and row[1] == program_name and row[2] == college_code):
-                    programs_data.append(row)
-
-        with open(PROGRAM_FILE, mode='w', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow(headers)
-            writer.writerows(programs_data)
-
-        messagebox.showinfo("Success", f"Program {program_code} deleted successfully!")
-
-        load_programs()  
-        display_students()  
-        view_programs_function()  
-
-    except Exception as e:
-        messagebox.showerror("Error", f"An error occurred while updating/deleting: {e}")
-        import traceback
-        traceback.print_exc()
-
-def view_programs_function(event=None):
-    global program_table, view
-    restore_content()
-
-    side_bar_canvas.itemconfig(add_button, fill='#D7E3F5')  
-    side_bar_canvas.itemconfig(add_text, fill='#154BA6')
-    
-    if not is_form_visible: 
-        toggle_form()
-        frame.config(height=450, width=700)
-        frame.grid()
-
-        for widget in form_widgets:
-            if isinstance(widget, int):  
-                if frame.type(widget) != "text" and frame.type(widget) != "rectangle":  
-                    frame.delete(widget)  
-            else: 
-                widget.destroy()  
-
-        global back_icon
-        back_icon = PhotoImage(file="Images/back.png")
-
-        back_canvas = Canvas(root, width=30, height=30, bg="lightgray", highlightthickness=0)
-        image_id = back_canvas.create_image(15, 15, image=back_icon, anchor="center")
-
-        frame.create_window(20, 25, window=back_canvas)
-        form_widgets.append(back_canvas)
-        def on_hover(event):
-            overlapping = back_canvas.find_overlapping(event.x, event.y, event.x, event.y)
-            if image_id in overlapping:
-                back_canvas.config(cursor="hand2")  
-            else:
-                back_canvas.config(cursor="")
-
-        back_canvas.bind("<Button-1>", programs_func)
-        back_canvas.bind("<Motion>", on_hover)
-        back_canvas.bind("<Leave>", lambda event: back_canvas.config(cursor=""))
-
-        side_bar_canvas.configure(bg="lightgray")
-
-        all_programs_frame = create_rounded_rectangle(frame, -300, 0, 700, 450, radius=130, fill='lightgray')
-        form_widgets.append(all_programs_frame)
-        
-        view = Label(root, text="Programs", font=("Arial", 25, "bold"), bg="lightgray", fg="#2363C6")
-        frame.create_window(350, 30, window=view)
-        form_widgets.append(view)
-
-        style = ttk.Style()
-        style.configure("Custom.Treeview", background="white", foreground="black", rowheight=25, fieldbackground="white")
-        style.configure("Custom.Treeview.Heading", background="white", foreground="black", font=("Arial", 10, "bold"), relief="flat")  
-        style.map("Custom.Treeview", background=[("selected", "#2E5EB5")]) 
-
-        columns = ("#1", "#2", "#3", "#4")
-        program_table = ttk.Treeview(root, style="Custom.Treeview", columns=columns, show="headings", height=7)
-        program_table.heading("#1", text="Program Code")
-        program_table.heading("#2", text="Program Name")
-        program_table.heading("#3", text="College Code")
-        program_table.heading("#4", text="Number of Students")
-
-        program_table.column("#1", width=120, anchor="w")
-        program_table.column("#2", width=280, anchor="w")
-        program_table.column("#3", width=120, anchor="center")
-        program_table.column("#4", width=130, anchor="center")
-
-        program_table.tag_configure("hover", background="#C5D5F0")
-        def disable_column_drag(event):
-            region = program_table.identify_region(event.x, event.y)
-            if region == "separator" or region == "heading":
-                return "break"
-
-        program_table.bind('<Button-1>', disable_column_drag, add='+')
-        program_table.bind('<B1-Motion>', disable_column_drag, add='+')
-        original_colors = {}
-
-        student_count_per_program = {}
-        if os.path.exists("students.csv"):
-            with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader)  # Skip header
-                for row in reader:
-                    if len(row) > 6:
-                        program = row[6]
-                        student_count_per_program[program] = student_count_per_program.get(program, 0) + 1
-
-        if os.path.exists(PROGRAM_FILE):
-            with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader) 
-                for row in reader:
-                    if len(row) >= 3:
-                        program_code, program_name, college_code = row
-                        student_count = student_count_per_program.get(f"{program_code} - {program_name}", 0)
-                        row_id = program_table.insert("", "end", values=(program_code, program_name, college_code, student_count), tags=("normal",))
-                        original_colors[row_id] = "normal"
-
-        frame.create_window(350, 170, window=program_table)
-        form_widgets.append(program_table)
-
-        hovered_row = None 
-
-        def on_hover(event):
-            nonlocal hovered_row
-            row_id = program_table.identify_row(event.y)
-            
-            if row_id and row_id != hovered_row:
-                if hovered_row and hovered_row in original_colors:
-                    program_table.item(hovered_row, tags=(original_colors[hovered_row],))
-                
-                hovered_row = row_id
-                if row_id in original_colors:
-                    program_table.item(row_id, tags=("hover",))
-
-        def on_leave(event):
-            nonlocal hovered_row
-            if hovered_row and hovered_row in original_colors:
-                program_table.item(hovered_row, tags=(original_colors[hovered_row],)) 
-            hovered_row = None
-
-        program_table.bind("<Motion>", on_hover)
-        program_table.bind("<Leave>", on_leave)
-
-        # Edit button
-        edit_canvas = Canvas(root, width=100, height=30, bg="lightgray", highlightthickness=0)
-        frame.create_window(75, 300, window=edit_canvas)
-        form_widgets.append(edit_canvas)
-
-        edit_button = create_rounded_rectangle(edit_canvas, 5, 5, 100, 30, radius=20, fill='#2363C6')
-        form_widgets.append(edit_button)
-        edit_text = edit_canvas.create_text(50, 17, text="Edit", fill="white", font=("Arial", 12, "bold"))
-
-        # Delete button
-        delete_canvas = Canvas(root, width=100, height=30, bg="lightgray", highlightthickness=0)
-        frame.create_window(175, 300, window=delete_canvas)
-        form_widgets.append(delete_canvas)
-
-        delete = create_rounded_rectangle(delete_canvas, 5, 5, 100, 30, radius=20, fill='#AA4141')
-        form_widgets.append(delete)
-        delete_text = delete_canvas.create_text(50, 17, text="Delete", fill="white", font=("Arial", 12, "bold")) 
-
-        # Close button
-        close_canvas = Canvas(root, width=100, height=45, bg="lightgray", highlightthickness=0)
-        frame.create_window(350, 400, window=close_canvas)
-        form_widgets.append(close_canvas)
-
-        close = create_rounded_rectangle(close_canvas, 5, 5, 100, 45, radius=20, fill='#AA4141')
-        form_widgets.append(close)
-        close_program = close_canvas.create_text(50, 24, text="Close", fill="white", font=("Arial", 15, "bold"))        
-
-        bind_button_effects(close_canvas, close, close_program, 
-                    default_color="#AA4141", hover_color="#C75050", click_color="#B22929",
-                    default_text_color="white", hover_text_color="white",
-                    command=restore_content) 
-
-        bind_button_effects(delete_canvas, delete, delete_text, 
-                    default_color="#AA4141", hover_color="#C75050", click_color="#B22929",
-                    default_text_color="white", hover_text_color="white",
-                    command=delete_program)   
-        
-        bind_button_effects(edit_canvas, edit_button, edit_text, 
-                            default_color="#2363C6", hover_color="#2E5EB5", click_color="#1B3A7E",
-                            default_text_color="white", hover_text_color="white",
-                            command=edit_program)
 
 def on_sidebar_resize(event):
     global add_button, add_text, edit_button, edit_text, delete_button, delete_text, colleges_button, colleges_text, programs_button, programs_text
@@ -1877,7 +1060,7 @@ def on_sidebar_resize(event):
     offset_x = 0  
     icon_text_spacing = 4  
 
-    # Add Student Button 
+    # Add Student Button (remains the same)
     add_x1 = (canvas_width - add_width) // 2
     add_y1 = 35
     add_x2 = add_x1 + add_width
@@ -2089,34 +1272,24 @@ def filter_students():
     tree.delete(*tree.get_children())
 
     filtered_students = []
-    exact_matches = []  
-    partial_matches = []  
-
     for student in students:
         student_values = [str(value).lower().replace(",", "").strip() for value in student]
 
         original_name = student[1].lower().replace(",", "").strip()
         reversed_name = " ".join(reversed(student[1].split(","))).strip().lower()
 
-        gender_value = student_values[2]  
-        college = student_values[4] 
-        program = student_values[5]
+        gender_value = student_values[2]  # Assuming gender is at index 2
 
         if query == "male" or query == "female":
             if query == gender_value:
                 filtered_students.append(student)
-        elif query == college or query == program:
-            exact_matches.append(student)
         elif any(query in value for i, value in enumerate(student_values) if i != 2) or query in original_name or query in reversed_name:
-            partial_matches.append(student) 
-
-    filtered_students = exact_matches + partial_matches
+            filtered_students.append(student)
 
     for student in filtered_students:
         tree.insert("", "end", values=student)
 
     return filtered_students
-
 
 def on_input_change(*args):
     if search_var.get():
@@ -2204,47 +1377,90 @@ def load_students():
                     students.append([row[0], full_name, gender, year_level, college, program])
     return students
 
-def display_students(page=0):
-    global tree, students, current_page, total_pages, page_label, prev_button, next_button, original_students
-
-    if not hasattr(display_students, 'students_loaded'):
-        original_students = load_students()
-        display_students.students_loaded = True
-        display_students.original_students = original_students
-    else:
-        original_students = display_students.original_students
-
-    if not hasattr(display_students, 'current_students'):
-        display_students.current_students = original_students.copy()
-    
-    students = display_students.current_students
-
-    def calculate_rows_per_page():
-        content_frame.update_idletasks()
-        content_height = content_frame.winfo_height()
-        
-        row_height = 40
-        
-        header_height = 50
-        padding = 100
-        
-        max_rows = (content_height - header_height - padding) // row_height
-        return max(1, min(max_rows, 20))
-
-    students_per_page = calculate_rows_per_page()
-
-    total_pages = (len(students) + students_per_page - 1) // students_per_page
-    
-    current_page = min(page, total_pages - 1)
-
-    start_index = current_page * students_per_page
-    end_index = start_index + students_per_page
-    students_to_display = students[start_index:end_index]
+def display_students():
+    global tree, students, scroll_indicator
+    students = load_students()
 
     columns = ("ID No.", "Name", "Gender", "Year Level", "College", "Program")
 
     if not hasattr(display_students, "initialized"):
-        tree = ttk.Treeview(content_frame, columns=columns, show="headings", height=students_per_page, selectmode="browse")
+        tree = ttk.Treeview(content_frame, columns=columns, show="headings", height=20, selectmode="browse")
+
+        for col in columns:
+            tree.heading(col, text=col, anchor="w")
+            if col == "ID No.":
+                tree.column(col, anchor="w", width=100)
+            elif col == "Name":
+                tree.column(col, anchor="w", width=250)
+            elif col == "Gender":
+                tree.column(col, anchor="w", width=80)
+            elif col == "Year Level":
+                tree.column(col, anchor="w", width=100)
+            elif col == "College":
+                tree.column(col, anchor="w", width=80)
+            elif col == "Program":
+                tree.column(col, anchor="w", width=150)
+
+        tree.grid(row=0, column=0, sticky="nsew", pady=(70, 0), padx=(20, 0))
+
+        style = ttk.Style()
+        
+        style.configure("Treeview", font=('Albert Sans', 12), rowheight=40, padding=(5, 5), highlightthickness=0, borderwidth=0)
+        style.configure("Treeview.Heading", font=('Albert Sans', 15, 'bold'), anchor="w", padding=(1, 8), foreground="#9F9EA1", relief="flat", borderwidth=0)
+        style.layout("Treeview", [('Treeview.treearea', {'sticky': 'nswe'})])
+        style.map("Treeview", background=[('selected', '#2363C6')])
+
+        scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar.place(relx=1.0, rely=0.125, relheight=0.855, anchor="ne")
+
+        scroll_indicator = Canvas(content_frame, height=4, bg="light gray", highlightthickness=0)
+        scroll_indicator.place_forget()
+
+        def on_tree_scroll(*args):
+            first, last = tree.yview()
+            if first > 0:
+                tree_x = tree.winfo_x()
+                tree_y = tree.winfo_y()
+                tree_width = tree.winfo_width()
+                heading_height = style.lookup("Treeview.Heading", "padding")[1] * 4.5  # distance from heading
+
+                scroll_indicator.place(x=tree_x, y=tree_y + heading_height, 
+                                      width=tree_width - 80,  # scroll indicator width
+                                      height=4)
+                up_arrow.place(relx=0.97, rely=0.9, anchor="ne")
+            else:
+                scroll_indicator.place_forget()
+                up_arrow.place_forget()
+
+        tree.configure(yscrollcommand=lambda *args: (scrollbar.set(*args), on_tree_scroll(*args)))
+        
+        def update_scroll_indicator_position(*args):
+            if scroll_indicator.winfo_ismapped():
+                first, last = tree.yview()
+                if first > 0:
+                    tree_x = tree.winfo_x()
+                    tree_y = tree.winfo_y()
+                    tree_width = tree.winfo_width()
+                    heading_height = style.lookup("Treeview.Heading", "padding")[1] * 2
+                    
+                    scroll_indicator.place(x=tree_x, y=tree_y + heading_height, 
+                                          width=tree_width - 20, 
+                                          height=4)
+        
+        content_frame.bind("<Configure>", update_scroll_indicator_position)
+        
+        def scroll_to_top():
+            tree.yview_moveto(0)
+
+        def scroll_to_bottom():
+            tree.yview_moveto(1)
+
+        up_arrow = Button(content_frame, text="▲", command=scroll_to_top, bg="white", fg="black", font=("Arial", 8, "bold"), bd=0)
+        down_arrow = Button(content_frame, text="▼", command=scroll_to_bottom, bg="white", fg="black", font=("Arial", 8, "bold"), bd=0)
+
+        down_arrow.place(relx=0.97, rely=0.95, anchor="ne") 
+
         def disable_column_drag(event):
             region = tree.identify_region(event.x, event.y)
             if region == "separator" or region == "heading":
@@ -2252,59 +1468,36 @@ def display_students(page=0):
 
         tree.bind('<Button-1>', disable_column_drag, add='+')
         tree.bind('<B1-Motion>', disable_column_drag, add='+')
-        for col in columns:
-            tree.heading(col, text=col, anchor="w")
-            tree.column(col, anchor="w", width=100 if col in ["ID No.", "Year Level", "Gender", "College"] else 250)
-
-        tree.grid(row=0, column=0, sticky="nsew", pady=(70, 0), padx=(20, 0))
-
-        style = ttk.Style()
-        style.configure("Treeview", font=('Albert Sans', 12), rowheight=40, padding=(5, 5))
-        style.configure("Treeview.Heading", font=('Albert Sans', 15, 'bold'), anchor="w", padding=(1, 8), foreground="#9F9EA1")
-
-        scrollbar = ttk.Scrollbar(content_frame, orient="vertical", command=tree.yview)
-        tree.configure(yscrollcommand=scrollbar.set)
-        scrollbar.place(relx=1.0, rely=0.125, relheight=0.855, anchor="ne")
-
-
-        nav_frame = Frame(content_frame)
-        nav_frame.grid(row=1, column=0, pady=10, sticky="ew")
-
-        prev_button = Button(nav_frame, text="Previous", command=lambda: change_page(-1))
-        prev_button.pack(side=LEFT, padx=5)
-
-        page_label = Label(nav_frame, text="")
-        page_label.pack(side=LEFT)
-
-        next_button = Button(nav_frame, text="Next", command=lambda: change_page(1))
-        next_button.pack(side=LEFT, padx=5)
-
-        content_frame.bind("<Configure>", lambda e: display_students(current_page))
 
         display_students.initialized = True
 
     for row in tree.get_children():
         tree.delete(row)
-
-    for student in students_to_display:
+    for student in students:
         tree.insert("", "end", values=student)
 
-    page_label.config(text=f"Page {current_page+1} of {total_pages}")
+    def resize_columns(event=None):
+        total_width = tree.winfo_width()
+        tree_font = font.Font(font=('Albert Sans', 12))
+        max_width = max([tree_font.measure(tree.set(item, "Name")) for item in tree.get_children()], default=200)
+        tree.column("Name", width=max_width + 20)
 
-    prev_button.config(state=NORMAL if current_page > 0 else DISABLED)
-    next_button.config(state=NORMAL if current_page < total_pages - 1 else DISABLED)
-    return students_per_page
+    tree.bind("<Configure>", resize_columns)
+    search_var.trace_add("write", lambda *args: filter_students())
 
-def initialize_display():
-    content_frame.update_idletasks()
-    display_students(0)
+    def toggle_selection(event):
+        clicked_item = tree.identify_row(event.y)
+        selected_item = tree.selection()
 
+        if clicked_item:
+            if clicked_item in selected_item:
+                tree.after(1, lambda: tree.selection_remove(clicked_item))
+            else:
+                tree.after(1, lambda: tree.selection_set(clicked_item))
+        else:
+            tree.after(1, lambda: tree.selection_remove(selected_item))
 
-def change_page(direction):
-    new_page = current_page + direction
-    if 0 <= new_page < total_pages:
-        display_students(new_page)
-
+    tree.bind("<Button-1>", toggle_selection)
 
 def remove(event):
     root.focus_set()
@@ -2314,47 +1507,58 @@ def sort_click(event):
 
 sort_order = True
 
-def sort_name():
-
-    if not hasattr(display_students, 'original_students'):
-        display_students.original_students = load_students()
-    
-    if not hasattr(sort_name, 'reverse'):
-        sort_name.reverse = False
-    sort_name.reverse = not sort_name.reverse
-
-    students_to_sort = display_students.original_students.copy()
-    
-    students_to_sort.sort(key=lambda x: x[1].strip().lower(), reverse=sort_name.reverse)
-    
-    display_students.current_students = students_to_sort
-    
-    display_students(0)
-
-    sort_text.configure(text="Descending" if sort_name.reverse else "Ascending")
-
 def sort_id():
-    if not hasattr(display_students, 'original_students'):
-        display_students.original_students = load_students()
-    
-    if not hasattr(sort_id, 'reverse'):
-        sort_id.reverse = False
-    sort_id.reverse = not sort_id.reverse
+    global tree, sort_order
+
+    sort_order = not sort_order  
+    id_reverse = not sort_order  
 
     def parse_id(id_str):
+
         try:
             year, number = map(int, id_str.split("-")) 
             return (year, number)
         except ValueError:
             return (float('inf'), float('inf')) 
+    displayed_students = []
+    for item in tree.get_children():
+        displayed_students.append(tree.item(item, "values")) 
+    displayed_students.sort(key=lambda x: parse_id(x[0]), reverse=id_reverse)
 
-    students_to_sort = display_students.original_students.copy()
 
-    students_to_sort.sort(key=lambda x: parse_id(x[0]), reverse=sort_id.reverse)
+    for item in tree.get_children():
+        tree.delete(item)
 
-    display_students.current_students = students_to_sort
-    display_students(0)
-    id_text.configure(text="Descending" if sort_id.reverse else "Ascending")
+    for student in displayed_students:
+        tree.insert("", "end", values=student)
+
+    if id_reverse:
+        id_text.configure(text="Descending")
+    else:
+        id_text.configure(text="Ascending")
+
+def sort_name(event=None):
+    global tree, sort_order
+
+    sort_order = not sort_order  
+    name_reverse = not sort_order  
+
+    displayed_students = []
+    for item in tree.get_children():
+        displayed_students.append(tree.item(item, "values"))
+    displayed_students.sort(key=lambda x: x[1].strip().lower(), reverse=name_reverse)
+
+
+    for item in tree.get_children():
+        tree.delete(item)
+
+    for student in displayed_students:
+        tree.insert("", "end", values=student)
+
+    if name_reverse:
+        sort_text.configure(text="Descending")
+    else:
+        sort_text.configure(text="Ascending")
 
 def sort_click_release(event):
     global sorting,sort_text,id_text
