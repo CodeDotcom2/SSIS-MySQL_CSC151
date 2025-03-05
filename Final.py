@@ -1745,7 +1745,7 @@ def view_programs_function(event=None):
         program_table.heading("#1", text="Program Code")
         program_table.heading("#2", text="Program Name")
         program_table.heading("#3", text="College Code")
-        program_table.heading("#4", text="Number of Students")
+        program_table.heading("#4", text="Num. of Students")
 
         program_table.column("#1", width=120, anchor="w")
         program_table.column("#2", width=280, anchor="w")
@@ -2086,13 +2086,18 @@ def filter_students():
 
     query = search_var.get().strip().lower().replace(",", "").replace("  ", " ")
 
+    if not query:
+        display_students.current_students = display_students.original_students
+        display_students(0)
+        return display_students.original_students
+
     tree.delete(*tree.get_children())
 
     filtered_students = []
     exact_matches = []  
     partial_matches = []  
 
-    for student in students:
+    for student in display_students.original_students:
         student_values = [str(value).lower().replace(",", "").strip() for value in student]
 
         original_name = student[1].lower().replace(",", "").strip()
@@ -2102,21 +2107,31 @@ def filter_students():
         college = student_values[4] 
         program = student_values[5]
 
+
         if query == "male" or query == "female":
             if query == gender_value:
                 filtered_students.append(student)
+        
         elif query == college or query == program:
             exact_matches.append(student)
-        elif any(query in value for i, value in enumerate(student_values) if i != 2) or query in original_name or query in reversed_name:
+        
+        elif query in college:
+            exact_matches.append(student)
+        
+        elif query in program:
+            exact_matches.append(student)
+        
+        elif any(query in value for i, value in enumerate(student_values) if i != 2) or \
+             query in original_name or query in reversed_name:
             partial_matches.append(student) 
 
     filtered_students = exact_matches + partial_matches
 
-    for student in filtered_students:
-        tree.insert("", "end", values=student)
+    display_students.current_students = filtered_students
+
+    display_students(0)
 
     return filtered_students
-
 
 def on_input_change(*args):
     if search_var.get():
@@ -2312,10 +2327,7 @@ def remove(event):
 def sort_click(event):
     sort_canvas.itemconfig(sort_frame, fill="light gray")
 
-sort_order = True
-
 def sort_name():
-
     if not hasattr(display_students, 'original_students'):
         display_students.original_students = load_students()
     
@@ -2323,7 +2335,7 @@ def sort_name():
         sort_name.reverse = False
     sort_name.reverse = not sort_name.reverse
 
-    students_to_sort = display_students.original_students.copy()
+    students_to_sort = display_students.current_students.copy() if len(display_students.current_students) < len(display_students.original_students) else display_students.original_students.copy()
     
     students_to_sort.sort(key=lambda x: x[1].strip().lower(), reverse=sort_name.reverse)
     
@@ -2348,7 +2360,7 @@ def sort_id():
         except ValueError:
             return (float('inf'), float('inf')) 
 
-    students_to_sort = display_students.original_students.copy()
+    students_to_sort = display_students.current_students.copy() if len(display_students.current_students) < len(display_students.original_students) else display_students.original_students.copy()
 
     students_to_sort.sort(key=lambda x: parse_id(x[0]), reverse=sort_id.reverse)
 
