@@ -367,6 +367,7 @@ def toggle_form():
         def submit_release(event):
             submit_canvas.itemconfig(submit, fill='#2363C6')
             save_to_csv()
+            remove(event=None)
             
         def submit_hover(event):
             submit_canvas.itemconfig(submit, fill='#154BA6') 
@@ -727,15 +728,12 @@ def save_college():
         messagebox.showerror("Input Error", "All fields are required.")
         return
 
-    if not re.fullmatch(r"[A-Z0-9\-]+", college_code_value):
-        messagebox.showerror("Input Error", "College code must contain only uppercase letters, numbers, and dashes.")
+    if not re.fullmatch(r"[A-Za-z\s-]+", college_name_value) or not re.fullmatch(r"[A-Za-z\s-]+", college_code_value):
+        messagebox.showerror("Input Error", "College name must contain only letters, spaces, and dashes (no numbers allowed).")
         return
+
 
     college_name_value = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in college_name_value.split()])
-
-    if not re.fullmatch(r"[A-Za-z0-9\s-]+", college_name_value):
-        messagebox.showerror("Input Error", "College name must contain only letters, numbers, and dashes.")
-        return
 
     if len(college_code_value) > 20:
         messagebox.showerror("Input Error", "College code must not exceed 20 characters.")
@@ -754,16 +752,13 @@ def save_college():
     college_names[formatted_college] = []
 
     try:
-        # Read existing data
         colleges_data = []
         with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
             reader = csv.reader(file)
             colleges_data = list(reader)
 
-        # Add new college
         colleges_data.append([college_code_value, college_name_value])
 
-        # Write data back to file
         with open(COLLEGE_FILE, mode='w', newline='', encoding='utf-8') as file:
             writer = csv.writer(file)
             writer.writerows(colleges_data)
@@ -786,7 +781,7 @@ def save_college():
     course_code.delete(0, "end")
     course_code.insert(0, "Ex: CCS")
     course_code.config(fg="gray", justify="center")
-    
+    remove(event=None)
 def add_college_function(event=None):
     global course_code,course_name,save_canvas,save_button,save_text,manage_text,back_canvas2
 
@@ -929,15 +924,11 @@ def edit_college():
             messagebox.showerror("Input Error", "All fields are required.")
             return
 
-        if not re.fullmatch(r"[A-Z0-9\-]+", new_college_code):
-            messagebox.showerror("Input Error", "College code must contain only uppercase letters, numbers, and dashes.")
+        if not re.fullmatch(r"[A-Za-z\s-]+", new_college_name):
+            messagebox.showerror("Input Error", "College name must contain only letters, spaces, and dashes (no numbers allowed).")
             return
-
+        
         new_college_name = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in new_college_name.split()])
-
-        if not re.fullmatch(r"[A-Za-z0-9\s-]+", new_college_name):
-            messagebox.showerror("Input Error", "College name must contain only letters, numbers, and dashes.")
-            return
 
         if len(new_college_code) > 20:
             messagebox.showerror("Input Error", "College code must not exceed 20 characters.")
@@ -958,24 +949,20 @@ def edit_college():
             return
 
         try:
-            # Read existing colleges
             colleges_data = []
             with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
                 reader = csv.reader(file)
                 colleges_data = list(reader)
                 
-                # Find and replace the old college with the new one
                 for i, row in enumerate(colleges_data):
                     if row[0] == colleges_code and row[1] == colleges_name:
                         colleges_data[i] = [new_college_code, new_college_name]
                         break
 
-            # Write updated data back to file
             with open(COLLEGE_FILE, mode='w', newline='', encoding='utf-8') as file:
                 writer = csv.writer(file)
                 writer.writerows(colleges_data)
 
-            # Rest of the existing update code remains the same
             if os.path.exists(PROGRAM_FILE):
                 programs_data = []
                 with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
@@ -1015,7 +1002,6 @@ def edit_college():
             view_college_function()
             load_programs()
             display_students()
-
             messagebox.showinfo("Success", "College information updated successfully!")
 
         except Exception as e:
@@ -1332,16 +1318,15 @@ def save_program():
         messagebox.showerror("Error", "Please enter a valid program code.")
         return 
 
-    if not re.fullmatch(r"[A-Z0-9\-]+", program_code_value):
-        messagebox.showerror("Input Error", "Program code must contain only uppercase letters, numbers, and dashes.")
-        return 
-
     program_name_value = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in program_name_value.split()])
 
-    if not re.fullmatch(r"[A-Za-z0-9\s-]+", program_name_value):
-        messagebox.showerror("Input Error", "Program name must contain only letters, numbers, and dashes.")
+    if not re.fullmatch(r"[A-Za-z\s-]+", program_name_value):
+        messagebox.showerror("Input Error", "Program name must contain only letters, spaces, and dashes (no numbers allowed).")
         return 
-
+    if not re.fullmatch(r"[A-Za-z\s-]+", program_code_value):
+        messagebox.showerror("Input Error", "Program code must contain only letters, spaces, and dashes (no numbers allowed).")
+        return
+    
     college_code = selected_college.split(" - ")[0]
     headers_exist = False
     existing_programs = set()
@@ -1379,6 +1364,8 @@ def save_program():
     program_code.delete(0, END)
     program_code.insert(0, "Ex: BSCS")
     program_code.config(fg="gray", justify="center")
+    remove(event=None)
+
 
 def add_program_function(event=None):
     global program_dropdown,program_code,program_name,manage_text2,save_canvas2,save_button2,save_text2,back_canvas
@@ -1533,16 +1520,14 @@ def edit_program():
             messagebox.showerror("Input Error", "All fields are required.")
             return
 
-        if not re.fullmatch(r"[A-Z0-9\-]+", new_program_code):
-            messagebox.showerror("Input Error", "Program code must contain only uppercase letters, numbers, and dashes.")
-            return
-
         new_program_name = ' '.join([word.capitalize() if len(word) > 2 else word.lower() for word in new_program_name.split()])
 
-        if not re.fullmatch(r"[A-Za-z0-9\s-]+", new_program_name):
-            messagebox.showerror("Input Error", "Program name must contain only letters, numbers, and dashes.")
+        if not re.fullmatch(r"[A-Za-z\s-]+", new_program_name):
+            messagebox.showerror("Input Error", "Program name must contain only letters, spaces, and dashes (no numbers allowed).")
             return
-
+        if not re.fullmatch(r"[A-Za-z\s-]+", new_program_code):
+            messagebox.showerror("Input Error", "Program code must contain only letters, spaces, and dashes (no numbers allowed).")
+            return
         new_college_code = selected_college.split(" - ")[0]
         old_college_code = old_college_name.split(" - ")[0]
 
@@ -1551,7 +1536,6 @@ def edit_program():
             return
 
         try:
-            # Read and update programs file
             programs_data = []
             program_headers = None
 
@@ -1570,7 +1554,6 @@ def edit_program():
                 writer.writerow(program_headers)
                 writer.writerows(programs_data)
 
-            # Update students file if it exists
             if os.path.exists("students.csv"):
                 students_data = []
                 students_headers = None
@@ -1579,7 +1562,7 @@ def edit_program():
                     students_headers = next(reader)
                     for row in reader:
                         if len(row) > 6 and row[6] == f"{old_program_code} - {old_program_name}":
-                            row[6] = f"{new_program_code} - {new_program_name}"  # Update full program name
+                            row[6] = f"{new_program_code} - {new_program_name}"
                         students_data.append(row)
 
                 with open("students.csv", mode='w', newline='', encoding='utf-8') as file:
@@ -1689,8 +1672,11 @@ def delete_program(event=None):
         traceback.print_exc()
 
 def view_programs_function(event=None):
-    global program_table, view
+    global program_table, view, college_dropdown, college_var
     restore_content()
+
+    load_colleges()
+    load_programs()
 
     side_bar_canvas.itemconfig(add_button, fill='#D7E3F5')  
     side_bar_canvas.itemconfig(add_text, fill='#154BA6')
@@ -1735,6 +1721,71 @@ def view_programs_function(event=None):
         frame.create_window(350, 30, window=view)
         form_widgets.append(view)
 
+        filter_label = Label(root, text="Filter by College:", font=("Arial", 12,"bold"), bg="lightgray", fg="black")
+        frame.create_window(80, 75, window=filter_label)
+        form_widgets.append(filter_label)
+
+        college_var = StringVar()
+
+        college_list = ["All Colleges"] + [college.split(" - ")[0] for college in college_names.keys()]
+        college_var.set(college_list[0])
+        college_dropdown = ttk.Combobox(root, textvariable=college_var, values=college_list, 
+                                       state="readonly", width=14, font=("Arial", 11))
+        frame.create_window(215, 75, window=college_dropdown)
+        form_widgets.append(college_dropdown)
+
+        def get_student_counts():
+            student_count_per_program = {}
+            if os.path.exists("students.csv"):
+                with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
+                    reader = csv.reader(file)
+                    next(reader)  
+                    for row in reader:
+                        if len(row) > 6:
+                            program = row[6]
+                            student_count_per_program[program] = student_count_per_program.get(program, 0) + 1
+            return student_count_per_program
+
+        def update_table(*args):
+            for item in program_table.get_children():
+                program_table.delete(item)
+            
+            student_count_per_program = get_student_counts()
+            selected_college = college_var.get()
+            filtered_programs = []
+            
+            if selected_college == "All Colleges":
+                for college, programs in college_names.items():
+                    college_code = college.split(" - ")[0]
+                    for program in programs:
+                        program_parts = program.split(" - ")
+                        if len(program_parts) >= 2:
+                            program_code = program_parts[0]
+                            program_name = program_parts[1]
+                            student_count = student_count_per_program.get(program, 0)
+                            filtered_programs.append((program_code, program_name, college_code, student_count))
+            else:
+                college_code = selected_college
+                for college, programs in college_names.items():
+                    if college.startswith(college_code):
+                        for program in programs:
+                            program_parts = program.split(" - ")
+                            if len(program_parts) >= 2:
+                                program_code = program_parts[0]
+                                program_name = program_parts[1]
+                                student_count = student_count_per_program.get(program, 0)
+                                filtered_programs.append((program_code, program_name, college_code, student_count))
+                        break
+            
+            filtered_programs.sort(key=lambda x: x[2])
+            
+            for program in filtered_programs:
+                program_code, program_name, college_code, student_count = program
+                row_id = program_table.insert("", "end", values=(program_code, program_name, college_code, student_count), tags=("normal",))
+                original_colors[row_id] = "normal"
+                
+        college_var.trace("w", update_table)
+
         style = ttk.Style()
         style.configure("Custom.Treeview", background="white", foreground="black", rowheight=25, fieldbackground="white")
         style.configure("Custom.Treeview.Heading", background="white", foreground="black", font=("Arial", 10, "bold"), relief="flat")  
@@ -1762,29 +1813,10 @@ def view_programs_function(event=None):
         program_table.bind('<B1-Motion>', disable_column_drag, add='+')
         original_colors = {}
 
-        student_count_per_program = {}
-        if os.path.exists("students.csv"):
-            with open("students.csv", mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader)  # Skip header
-                for row in reader:
-                    if len(row) > 6:
-                        program = row[6]
-                        student_count_per_program[program] = student_count_per_program.get(program, 0) + 1
-
-        if os.path.exists(PROGRAM_FILE):
-            with open(PROGRAM_FILE, mode='r', newline='', encoding='utf-8') as file:
-                reader = csv.reader(file)
-                next(reader) 
-                for row in reader:
-                    if len(row) >= 3:
-                        program_code, program_name, college_code = row
-                        student_count = student_count_per_program.get(f"{program_code} - {program_name}", 0)
-                        row_id = program_table.insert("", "end", values=(program_code, program_name, college_code, student_count), tags=("normal",))
-                        original_colors[row_id] = "normal"
-
-        frame.create_window(350, 170, window=program_table)
+        frame.create_window(350, 200, window=program_table)
         form_widgets.append(program_table)
+
+        update_table()
 
         hovered_row = None 
 
@@ -1811,7 +1843,7 @@ def view_programs_function(event=None):
 
         # Edit button
         edit_canvas = Canvas(root, width=100, height=30, bg="lightgray", highlightthickness=0)
-        frame.create_window(75, 300, window=edit_canvas)
+        frame.create_window(75, 330, window=edit_canvas)
         form_widgets.append(edit_canvas)
 
         edit_button = create_rounded_rectangle(edit_canvas, 5, 5, 100, 30, radius=20, fill='#2363C6')
@@ -1820,7 +1852,7 @@ def view_programs_function(event=None):
 
         # Delete button
         delete_canvas = Canvas(root, width=100, height=30, bg="lightgray", highlightthickness=0)
-        frame.create_window(175, 300, window=delete_canvas)
+        frame.create_window(175, 330, window=delete_canvas)
         form_widgets.append(delete_canvas)
 
         delete = create_rounded_rectangle(delete_canvas, 5, 5, 100, 30, radius=20, fill='#AA4141')
@@ -1851,6 +1883,33 @@ def view_programs_function(event=None):
                             default_text_color="white", hover_text_color="white",
                             command=edit_program)
 
+def refresh_college_filters():
+    if 'college_dropdown' in globals() and 'college_var' in globals():
+        current_selection = college_var.get()
+        
+        COLLEGE_FILE = "colleges.csv" 
+        college_list = []
+        
+        if os.path.exists(COLLEGE_FILE):
+            with open(COLLEGE_FILE, mode='r', newline='', encoding='utf-8') as file:
+                reader = csv.reader(file)
+                next(reader) 
+                for row in reader:
+                    if len(row) >= 2:
+                        college_code = row[0]
+                        college_list.append(college_code)
+        
+        sorted_colleges = sorted(college_list)
+        sorted_colleges.insert(0, "All Colleges")
+        
+        college_dropdown['values'] = sorted_colleges
+
+        if current_selection in sorted_colleges:
+            college_var.set(current_selection)
+        else:
+            college_var.set(sorted_colleges[0]) 
+        
+        
 def on_sidebar_resize(event):
     global add_button, add_text, edit_button, edit_text, delete_button, delete_text, colleges_button, colleges_text, programs_button, programs_text
     global edit_icon_img, delete_icon_img, colleges_icon_img, programs_icon_img, delete_icon, edit_icon, colleges_icon, programs_icon
@@ -2222,14 +2281,12 @@ def load_students():
 def display_students(page=0):
     global tree, students, current_page, total_pages, page_label, prev_button, next_button, original_students
 
-    if not hasattr(display_students, 'students_loaded'):
-        original_students = load_students()
-        display_students.students_loaded = True
-        display_students.original_students = original_students
+    original_students = load_students()
+    display_students.original_students = original_students
+    
+    if hasattr(display_students, 'current_students') and display_students.current_students != original_students:
+        display_students.current_students = original_students.copy()
     else:
-        original_students = display_students.original_students
-
-    if not hasattr(display_students, 'current_students'):
         display_students.current_students = original_students.copy()
     
     students = display_students.current_students
@@ -2250,8 +2307,7 @@ def display_students(page=0):
 
     total_pages = (len(students) + students_per_page - 1) // students_per_page
     
-    current_page = min(page, total_pages - 1)
-
+    current_page = min(page, max(0, total_pages - 1)) 
     start_index = current_page * students_per_page
     end_index = start_index + students_per_page
     students_to_display = students[start_index:end_index]
@@ -2304,7 +2360,7 @@ def display_students(page=0):
     for student in students_to_display:
         tree.insert("", "end", values=student)
 
-    page_label.config(text=f"Page {current_page+1} of {total_pages}")
+    page_label.config(text=f"Page {current_page+1} of {max(1, total_pages)}")
 
     prev_button.config(state=NORMAL if current_page > 0 else DISABLED)
     next_button.config(state=NORMAL if current_page < total_pages - 1 else DISABLED)
