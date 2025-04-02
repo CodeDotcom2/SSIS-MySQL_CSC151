@@ -44,6 +44,3 @@ def body(root):
     vsb.grid(row=0, column=1, sticky="ns")
     hsb.grid(row=1, column=0, sticky="ew")
     
-
-
-    return body_frame

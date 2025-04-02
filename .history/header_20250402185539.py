@@ -1,8 +1,6 @@
 from tkinter import *
 from misc import remove_focus,create_rounded_rectangle
 
-top = None
-
 def header(root):
     global search_frame,icon_label,text_label, search_var,cancel,search_bar
     global icon1,text_image,cancel_butt
@@ -40,7 +38,7 @@ def header(root):
     icon_label.bind("<Button-1>",clear_placeholder)
     text_label.bind("<Button-1>",clear_placeholder)
     top.bind("<Button-1>",remove_focus)
-
+    
 def clear_placeholder(event=None):
     if search_var.get() == "":
         icon_label.place_forget()
@@ -82,3 +80,8 @@ def delete_entry():
     search_var.set("")
     search_bar.focus_set()
     cancel_butt.pack_forget()
+
+
+
+    
+
