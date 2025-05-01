@@ -403,17 +403,16 @@ def view_programs_form(root, body_frame=None):
         program_id = item_values[0]
         program_name = item_values[2]
         
-        confirm = messagebox.askyesno("Confirm Delete", 
-            f"Are you sure you want to mark '{program_name}' as deleted?")
+        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete {program_name}?")
         if confirm:
             success, message = delete_program(program_id)
             if success:
                 messagebox.showinfo("Success", message)
-                load_programs() 
-                refresh_students() 
+                load_programs()
+                refresh_students()  # Refresh the list
             else:
                 messagebox.showerror("Error", message)
-
+    
     delete_btn = Button(button_frame, text="Delete", command=delete_selected, bg="#AA4141", fg="white", 
                        font=("Arial", 12), padx=20, pady=5, border=0)
     delete_btn.pack(side=LEFT, padx=10)

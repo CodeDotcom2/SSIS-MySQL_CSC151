@@ -409,8 +409,8 @@ def view_programs_form(root, body_frame=None):
             success, message = delete_program(program_id)
             if success:
                 messagebox.showinfo("Success", message)
-                load_programs() 
-                refresh_students() 
+                load_programs()
+                refresh_students()  # Refresh the list
             else:
                 messagebox.showerror("Error", message)
 

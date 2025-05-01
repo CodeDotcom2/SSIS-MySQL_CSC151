@@ -398,19 +398,21 @@ def view_programs_form(root, body_frame=None):
             messagebox.showwarning("Warning", "Please select a program to delete")
             return
         
-        # Get values from the selected item
         item_values = program_tree.item(selected_item[0], "values")
         program_id = item_values[0]
         program_name = item_values[2]
         
-        confirm = messagebox.askyesno("Confirm Delete", 
-            f"Are you sure you want to mark '{program_name}' as deleted?")
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Are you sure you want to delete '{program_name}'?\n"
+            "All enrolled students will be moved to an 'N/A' program."
+        )
+        
         if confirm:
             success, message = delete_program(program_id)
             if success:
                 messagebox.showinfo("Success", message)
-                load_programs() 
-                refresh_students() 
+                load_programs()  # Refresh the list
             else:
                 messagebox.showerror("Error", message)
 

@@ -73,35 +73,20 @@ def create_tables():
             print(f"Error creating tables: {e}")
         finally:
             connection.close()
-def create_default_na_programs():
-    """Ensures every college has an 'N/A' program (single-query version)."""
-    connection = create_connection()
-    if connection:
-        try:
-            cursor = connection.cursor()
-            cursor.execute("""
-                INSERT INTO programs (name, code, college_id)
-                SELECT 'N/A (Deleted Program)', 'N/A', c.id 
-                FROM colleges c
-                LEFT JOIN programs p ON c.id = p.college_id AND p.code = 'N/A'
-                WHERE p.id IS NULL
-            """)
-            connection.commit()
-            print(f"✅ Created {cursor.rowcount} default 'N/A' programs.")
-            return True
-        except Error as e:
-            print(f"❌ Error creating default N/A programs: {e}")
-            connection.rollback()
-            return False
-        finally:
-            connection.close()
-    return False
+
 # Student operations
 def save_student(first_name, last_name, id_number, year_level, gender, program_id):
     connection = create_connection()
     if connection is not None:
         try:
             cursor = connection.cursor()
+            
+            # Get college_id from program_id
+            college_id = None
+            if program_id:
+                cursor.execute("SELECT college_id FROM programs WHERE id = %s", (program_id,))
+                result = cursor.fetchone()
+                college_id = result[0] if result else None
             
             # Check if student ID already exists
             cursor.execute("SELECT id FROM students WHERE id_number = %s", (id_number,))
@@ -112,12 +97,12 @@ def save_student(first_name, last_name, id_number, year_level, gender, program_i
             year_mapping = {"1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5+": 5}
             year_level_int = year_mapping.get(year_level, 1)
             
-            # Insert student
+            # Insert student with both program_id and college_id
             cursor.execute("""
                 INSERT INTO students 
-                (first_name, last_name, id_number, year_level, gender, program_id) 
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (first_name, last_name, id_number, year_level_int, gender, program_id))
+                (first_name, last_name, id_number, year_level, gender, program_id, college_id) 
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (first_name, last_name, id_number, year_level_int, gender, program_id, college_id))
             
             connection.commit()
             return True, "Student saved successfully!"
@@ -134,6 +119,13 @@ def update_student(student_id, first_name, last_name, id_number, year_level, gen
         try:
             cursor = connection.cursor()
             
+            # Get college_id from program_id
+            college_id = None
+            if program_id:
+                cursor.execute("SELECT college_id FROM programs WHERE id = %s", (program_id,))
+                result = cursor.fetchone()
+                college_id = result[0] if result else None
+            
             # Check if student ID already exists for another student
             cursor.execute("SELECT id FROM students WHERE id_number = %s AND id != %s", 
                           (id_number, student_id))
@@ -144,13 +136,13 @@ def update_student(student_id, first_name, last_name, id_number, year_level, gen
             year_mapping = {"1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5+": 5}
             year_level_int = year_mapping.get(year_level, 1)
             
-            # Update student
+            # Update student with both program_id and college_id
             cursor.execute("""
                 UPDATE students 
                 SET first_name = %s, last_name = %s, id_number = %s, 
-                    year_level = %s, gender = %s, program_id = %s 
+                    year_level = %s, gender = %s, program_id = %s, college_id = %s
                 WHERE id = %s
-            """, (first_name, last_name, id_number, year_level_int, gender, program_id, student_id))
+            """, (first_name, last_name, id_number, year_level_int, gender, program_id, college_id, student_id))
             
             connection.commit()
             if cursor.rowcount > 0:
@@ -194,8 +186,8 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
             # Get total count with search filter if provided
             count_query = """
                 SELECT COUNT(*) as count FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN programs p ON s.program_id = p.id
+                LEFT JOIN colleges c ON s.college_id = c.id
             """
             
             params = []
@@ -204,8 +196,8 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
                     s.first_name LIKE %s OR 
                     s.last_name LIKE %s OR 
                     s.id_number LIKE %s OR 
-                    p.name LIKE %s OR 
-                    c.name LIKE %s
+                    COALESCE(p.name, 'N/A') LIKE %s OR 
+                    COALESCE(c.name, 'N/A') LIKE %s
                 """
                 search_pattern = f"%{search_term}%"
                 params = [search_pattern, search_pattern, search_pattern, search_pattern, search_pattern]
@@ -216,12 +208,17 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
             
             # Get paginated results
             query = """
-                SELECT s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
-                       p.id as program_id, p.name as program_name, p.code as program_code,
-                       c.id as college_id, c.name as college_name, c.code as college_code
+                SELECT 
+                    s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
+                    s.program_id,
+                    COALESCE(p.name, 'N/A') as program_name, 
+                    COALESCE(p.code, 'N/A') as program_code,
+                    c.id as college_id,
+                    COALESCE(c.name, 'N/A') as college_name,
+                    COALESCE(c.code, 'N/A') as college_code
                 FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN programs p ON s.program_id = p.id
+                LEFT JOIN colleges c ON s.college_id = c.id
             """
             
             if search_term:
@@ -229,8 +226,8 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
                     s.first_name LIKE %s OR 
                     s.last_name LIKE %s OR 
                     s.id_number LIKE %s OR 
-                    p.name LIKE %s OR 
-                    c.name LIKE %s
+                    COALESCE(p.name, 'N/A') LIKE %s OR 
+                    COALESCE(c.name, 'N/A') LIKE %s
                 """
             
             query += " ORDER BY s.last_name, s.first_name"
@@ -269,12 +266,12 @@ def get_student_by_id(student_id):
                        s.program_id,
                        COALESCE(p.name, 'N/A') as program_name,
                        COALESCE(p.code, 'N/A') as program_code,
-                       p.college_id as college_id,
+                       c.id as college_id,
                        COALESCE(c.name, 'N/A') as college_name,
                        COALESCE(c.code, 'N/A') as college_code
                 FROM students s
                 LEFT JOIN programs p ON s.program_id = p.id
-                LEFT JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN colleges c ON s.college_id = c.id
                 WHERE s.id = %s
             """, (student_id,))
             
@@ -327,19 +324,20 @@ def delete_college(college_id):
     if connection is not None:
         try:
             cursor = connection.cursor()
+            # Check if college has associated programs
+            cursor.execute("SELECT COUNT(*) FROM programs WHERE college_id = %s", (college_id,))
+            program_count = cursor.fetchone()[0]
+            if program_count > 0:
+                return False, "Cannot delete college that has programs"
             
-            cursor.execute("DELETE FROM programs WHERE college_id = %s", (college_id,))
-            
+            # Delete the college
             cursor.execute("DELETE FROM colleges WHERE id = %s", (college_id,))
-            
             connection.commit()
-            
             if cursor.rowcount > 0:
-                return True, "College and all its programs deleted successfully"
+                return True, "College deleted successfully"
             else:
                 return False, "College not found"
         except Error as e:
-            connection.rollback()
             print(f"Error deleting college: {e}")
             return False, f"Error: {str(e)}"
         finally:
@@ -401,22 +399,18 @@ def save_program(name, code, college_id):
             connection.close()
     return False, "Database connection failed"
 
-def get_all_programs(include_deleted=False):
+def get_all_programs():
     connection = create_connection()
     programs = []
     if connection is not None:
         try:
             cursor = connection.cursor(dictionary=True)
-            query = """
+            cursor.execute("""
                 SELECT p.id, p.name, p.code, p.college_id, c.name as college_name, c.code as college_code 
                 FROM programs p
                 JOIN colleges c ON p.college_id = c.id
-            """
-            if not include_deleted:
-                query += " WHERE p.name != 'N/A (Deleted)'"
-            query += " ORDER BY p.name"
-            
-            cursor.execute(query)
+                ORDER BY p.name
+            """)
             programs = cursor.fetchall()
         except Error as e:
             print(f"Error retrieving programs: {e}")
@@ -483,20 +477,28 @@ def delete_program(program_id):
         try:
             cursor = connection.cursor()
             
-            # Instead of deleting, update the program to mark it as "N/A"
+            # Get college_id from program before deleting
+            cursor.execute("SELECT college_id FROM programs WHERE id = %s", (program_id,))
+            result = cursor.fetchone()
+            college_id = result[0] if result else None
+            
+            # Update students to have NULL program_id but keep college_id
             cursor.execute("""
-                UPDATE programs 
-                SET name = 'N/A (Deleted)', code = 'N/A'
-                WHERE id = %s
+                UPDATE students 
+                SET program_id = NULL 
+                WHERE program_id = %s
             """, (program_id,))
             
+            # Now delete the program
+            cursor.execute("DELETE FROM programs WHERE id = %s", (program_id,))
             connection.commit()
+            
             if cursor.rowcount > 0:
-                return True, "Program marked as deleted successfully"
+                return True, "Program deleted successfully. Any enrolled students have been updated."
             else:
                 return False, "Program not found"
         except Error as e:
-            print(f"Error updating program: {e}")
+            print(f"Error deleting program: {e}")
             return False, f"Error: {str(e)}"
         finally:
             connection.close()
@@ -537,38 +539,26 @@ def migrate_database():
         if connection.is_connected():
             cursor = connection.cursor()
             
-            # Drop existing foreign key constraint first
+            # Add college_id column to students table if it doesn't exist
             try:
                 cursor.execute("""
                     ALTER TABLE students 
-                    DROP FOREIGN KEY students_ibfk_1;
+                    ADD COLUMN college_id INT NULL,
+                    ADD FOREIGN KEY (college_id) REFERENCES colleges(id) ON DELETE SET NULL;
                 """)
-                print("Dropped foreign key constraint")
-            except Error as e:
-                print(f"Error dropping foreign key or it doesn't exist: {e}")
-            
-            # Modify the program_id column to allow NULL values
-            try:
+                print("Added college_id column to students table")
+                
+                # Update existing records to set college_id
                 cursor.execute("""
-                    ALTER TABLE students 
-                    MODIFY program_id INT NULL;
+                    UPDATE students s
+                    JOIN programs p ON s.program_id = p.id
+                    SET s.college_id = p.college_id
+                    WHERE s.program_id IS NOT NULL;
                 """)
-                print("Modified program_id column to allow NULL values")
+                print("Updated existing student records with college_id")
+                
             except Error as e:
-                print(f"Error modifying column: {e}")
-            
-            # Add the new foreign key with ON DELETE SET NULL
-            try:
-                cursor.execute("""
-                    ALTER TABLE students 
-                    ADD CONSTRAINT students_ibfk_1 
-                    FOREIGN KEY (program_id) 
-                    REFERENCES programs(id) 
-                    ON DELETE SET NULL;
-                """)
-                print("Added new foreign key with ON DELETE SET NULL")
-            except Error as e:
-                print(f"Error adding foreign key: {e}")
+                print(f"Error modifying students table: {e}")
             
             connection.commit()
             print("Database migration completed successfully!")

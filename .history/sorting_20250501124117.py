@@ -1,0 +1,13 @@
+from tkinter import *
+from misc import create_rounded_rectangle
+from header import top
+
+
+
+def sort():
+    global sort
+    sort_canvas = Canvas(top,width=40,height=40,highlightthickness=0,bd=0,bg="white")
+    sort_canvas.grid(row=0,column=1,padx=(0,70),pady=0,sticky="e")
+    sort_frame = create_rounded_rectangle(sort_canvas, 4, 7, 35, 35, radius=20, fill="white") 
+    sort = PhotoImage(file="Images/sort.png")
+    sort_canvas.create_image(20, 16, image=sort, anchor="center") 

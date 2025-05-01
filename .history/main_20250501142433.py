@@ -3,12 +3,13 @@ from tkinter import ttk
 from header import header
 from side import side
 from body import body
-from database import create_database, create_tables,initialize_database
+from database import create_database, create_tables,initialize_database,create_default_na_programs
 
 def main():
     create_database()
     create_tables()
     initialize_database()
+    create_default_na_programs()
     root = Tk()
     root.title(" ")
     root.geometry("1200x700")

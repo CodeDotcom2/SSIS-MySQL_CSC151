@@ -62,8 +62,8 @@ def create_tables():
                 id_number VARCHAR(30) NOT NULL UNIQUE,
                 year_level INT,
                 gender VARCHAR(10),
-                program_id INT NULL,
-                FOREIGN KEY (program_id) REFERENCES programs(id) ON DELETE SET NULL
+                program_id INT,
+                FOREIGN KEY (program_id) REFERENCES programs(id)
             )
             """)
             
@@ -73,29 +73,7 @@ def create_tables():
             print(f"Error creating tables: {e}")
         finally:
             connection.close()
-def create_default_na_programs():
-    """Ensures every college has an 'N/A' program (single-query version)."""
-    connection = create_connection()
-    if connection:
-        try:
-            cursor = connection.cursor()
-            cursor.execute("""
-                INSERT INTO programs (name, code, college_id)
-                SELECT 'N/A (Deleted Program)', 'N/A', c.id 
-                FROM colleges c
-                LEFT JOIN programs p ON c.id = p.college_id AND p.code = 'N/A'
-                WHERE p.id IS NULL
-            """)
-            connection.commit()
-            print(f"✅ Created {cursor.rowcount} default 'N/A' programs.")
-            return True
-        except Error as e:
-            print(f"❌ Error creating default N/A programs: {e}")
-            connection.rollback()
-            return False
-        finally:
-            connection.close()
-    return False
+
 # Student operations
 def save_student(first_name, last_name, id_number, year_level, gender, program_id):
     connection = create_connection()
@@ -266,15 +244,11 @@ def get_student_by_id(student_id):
             cursor = connection.cursor(dictionary=True)
             cursor.execute("""
                 SELECT s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
-                       s.program_id,
-                       COALESCE(p.name, 'N/A') as program_name,
-                       COALESCE(p.code, 'N/A') as program_code,
-                       p.college_id as college_id,
-                       COALESCE(c.name, 'N/A') as college_name,
-                       COALESCE(c.code, 'N/A') as college_code
+                       p.id as program_id, p.name as program_name, p.code as program_code,
+                       c.id as college_id, c.name as college_name, c.code as college_code
                 FROM students s
-                LEFT JOIN programs p ON s.program_id = p.id
-                LEFT JOIN colleges c ON p.college_id = c.id
+                JOIN programs p ON s.program_id = p.id
+                JOIN colleges c ON p.college_id = c.id
                 WHERE s.id = %s
             """, (student_id,))
             
@@ -327,19 +301,20 @@ def delete_college(college_id):
     if connection is not None:
         try:
             cursor = connection.cursor()
+            # Check if college has associated programs
+            cursor.execute("SELECT COUNT(*) FROM programs WHERE college_id = %s", (college_id,))
+            program_count = cursor.fetchone()[0]
+            if program_count > 0:
+                return False, "Cannot delete college that has programs"
             
-            cursor.execute("DELETE FROM programs WHERE college_id = %s", (college_id,))
-            
+            # Delete the college
             cursor.execute("DELETE FROM colleges WHERE id = %s", (college_id,))
-            
             connection.commit()
-            
             if cursor.rowcount > 0:
-                return True, "College and all its programs deleted successfully"
+                return True, "College deleted successfully"
             else:
                 return False, "College not found"
         except Error as e:
-            connection.rollback()
             print(f"Error deleting college: {e}")
             return False, f"Error: {str(e)}"
         finally:
@@ -525,141 +500,3 @@ def get_college_program_counts():
         finally:
             connection.close()
     return results
-
-def migrate_database():
-    try:
-        connection = mysql.connector.connect(
-            host='localhost',
-            user='root',
-            password='2005',
-            database='student_db'
-        )
-        if connection.is_connected():
-            cursor = connection.cursor()
-            
-            # Drop existing foreign key constraint first
-            try:
-                cursor.execute("""
-                    ALTER TABLE students 
-                    DROP FOREIGN KEY students_ibfk_1;
-                """)
-                print("Dropped foreign key constraint")
-            except Error as e:
-                print(f"Error dropping foreign key or it doesn't exist: {e}")
-            
-            # Modify the program_id column to allow NULL values
-            try:
-                cursor.execute("""
-                    ALTER TABLE students 
-                    MODIFY program_id INT NULL;
-                """)
-                print("Modified program_id column to allow NULL values")
-            except Error as e:
-                print(f"Error modifying column: {e}")
-            
-            # Add the new foreign key with ON DELETE SET NULL
-            try:
-                cursor.execute("""
-                    ALTER TABLE students 
-                    ADD CONSTRAINT students_ibfk_1 
-                    FOREIGN KEY (program_id) 
-                    REFERENCES programs(id) 
-                    ON DELETE SET NULL;
-                """)
-                print("Added new foreign key with ON DELETE SET NULL")
-            except Error as e:
-                print(f"Error adding foreign key: {e}")
-            
-            connection.commit()
-            print("Database migration completed successfully!")
-            
-    except Error as e:
-        print(f"Error connecting to MySQL: {e}")
-    finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
-
-if __name__ == "__main__":
-    migrate_database()
-
-def initialize_database():
-    """Initialize the database and run any necessary migrations"""
-    create_database()
-    
-    # Connect to the database to check schema version or run migrations
-    connection = create_connection()
-    if connection is not None:
-        try:
-            cursor = connection.cursor()
-            
-            # Check for schema version table
-            cursor.execute("SHOW TABLES LIKE 'schema_version'")
-            if not cursor.fetchone():
-                # Create schema version table if it doesn't exist
-                cursor.execute("""
-                    CREATE TABLE schema_version (
-                        id INT PRIMARY KEY,
-                        version INT NOT NULL,
-                        applied_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                cursor.execute("INSERT INTO schema_version (id, version) VALUES (1, 0)")
-                connection.commit()
-            
-            # Get current schema version
-            cursor.execute("SELECT version FROM schema_version WHERE id = 1")
-            result = cursor.fetchone()
-            current_version = result[0] if result else 0
-            
-            # Apply migrations based on version
-            if current_version < 1:
-                print("Running migration to version 1...")
-                
-                # Drop existing foreign key constraint first
-                try:
-                    cursor.execute("""
-                        ALTER TABLE students 
-                        DROP FOREIGN KEY students_ibfk_1;
-                    """)
-                    print("Dropped foreign key constraint")
-                except Error as e:
-                    print(f"Error dropping foreign key or it doesn't exist: {e}")
-                
-                # Modify the program_id column to allow NULL values
-                try:
-                    cursor.execute("""
-                        ALTER TABLE students 
-                        MODIFY program_id INT NULL;
-                    """)
-                    print("Modified program_id column to allow NULL values")
-                except Error as e:
-                    print(f"Error modifying column: {e}")
-                
-                # Add the new foreign key with ON DELETE SET NULL
-                try:
-                    cursor.execute("""
-                        ALTER TABLE students 
-                        ADD CONSTRAINT students_ibfk_1 
-                        FOREIGN KEY (program_id) 
-                        REFERENCES programs(id) 
-                        ON DELETE SET NULL;
-                    """)
-                    print("Added new foreign key with ON DELETE SET NULL")
-                except Error as e:
-                    print(f"Error adding foreign key: {e}")
-                
-                # Update schema version
-                cursor.execute("UPDATE schema_version SET version = 1 WHERE id = 1")
-                connection.commit()
-                print("Migration to version 1 completed")
-            
-            print(f"Database initialized with schema version {current_version}")
-            
-        except Error as e:
-            print(f"Error initializing database: {e}")
-        finally:
-            connection.close()
-    
-    # Now create or confirm tables with latest schema
-    create_tables()

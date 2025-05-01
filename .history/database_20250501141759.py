@@ -73,29 +73,7 @@ def create_tables():
             print(f"Error creating tables: {e}")
         finally:
             connection.close()
-def create_default_na_programs():
-    """Ensures every college has an 'N/A' program (single-query version)."""
-    connection = create_connection()
-    if connection:
-        try:
-            cursor = connection.cursor()
-            cursor.execute("""
-                INSERT INTO programs (name, code, college_id)
-                SELECT 'N/A (Deleted Program)', 'N/A', c.id 
-                FROM colleges c
-                LEFT JOIN programs p ON c.id = p.college_id AND p.code = 'N/A'
-                WHERE p.id IS NULL
-            """)
-            connection.commit()
-            print(f"✅ Created {cursor.rowcount} default 'N/A' programs.")
-            return True
-        except Error as e:
-            print(f"❌ Error creating default N/A programs: {e}")
-            connection.rollback()
-            return False
-        finally:
-            connection.close()
-    return False
+
 # Student operations
 def save_student(first_name, last_name, id_number, year_level, gender, program_id):
     connection = create_connection()
@@ -191,11 +169,11 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
         try:
             cursor = connection.cursor(dictionary=True)
             
-            # Get total count with search filter if provided
+            # Get total count
             count_query = """
                 SELECT COUNT(*) as count FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN programs p ON s.program_id = p.id
+                LEFT JOIN colleges c ON p.college_id = c.id
             """
             
             params = []
@@ -208,20 +186,28 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
                     c.name LIKE %s
                 """
                 search_pattern = f"%{search_term}%"
-                params = [search_pattern, search_pattern, search_pattern, search_pattern, search_pattern]
+                params = [search_pattern]*5
             
             cursor.execute(count_query, params)
-            result = cursor.fetchone()
-            total_count = result['count'] if result else 0
-            
-            # Get paginated results
+            total_count = cursor.fetchone()['count']
+
+            # Get student data with original college info
             query = """
-                SELECT s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
-                       p.id as program_id, p.name as program_name, p.code as program_code,
-                       c.id as college_id, c.name as college_name, c.code as college_code
+                SELECT 
+                    s.id, s.first_name, s.last_name, s.id_number, 
+                    s.year_level, s.gender,
+                    p.id as program_id, 
+                    p.name as program_name, 
+                    p.code as program_code,
+                    c.id as college_id,
+                    c.name as college_name,
+                    c.code as college_code,
+                    -- Get original college info from program's college
+                    (SELECT name FROM colleges WHERE id = p.college_id) as original_college_name,
+                    (SELECT code FROM colleges WHERE id = p.college_id) as original_college_code
                 FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN programs p ON s.program_id = p.id
+                LEFT JOIN colleges c ON p.college_id = c.id
             """
             
             if search_term:
@@ -233,22 +219,26 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
                     c.name LIKE %s
                 """
             
-            query += " ORDER BY s.last_name, s.first_name"
-            query += " LIMIT %s OFFSET %s"
+            query += " ORDER BY s.last_name, s.first_name LIMIT %s OFFSET %s"
+            params.extend([items_per_page, (page-1)*items_per_page])
             
-            offset = (page - 1) * items_per_page
-            
-            if search_term:
-                search_pattern = f"%{search_term}%"
-                cursor.execute(
-                    query, 
-                    [search_pattern, search_pattern, search_pattern, search_pattern, search_pattern, 
-                     items_per_page, offset]
-                )
-            else:
-                cursor.execute(query, [items_per_page, offset])
-                
+            cursor.execute(query, params)
             students = cursor.fetchall()
+
+            # Process results
+            for student in students:
+                # Handle program display
+                if not student['program_id']:
+                    student['program_name'] = "N/A"
+                    student['program_code'] = "N/A"
+                
+                # Always use original college info if available
+                if student['original_college_name']:
+                    student['college_name'] = student['original_college_name']
+                    student['college_code'] = student['original_college_code']
+                elif not student['college_id']:
+                    student['college_name'] = "N/A"
+                    student['college_code'] = "N/A"
             
         except Error as e:
             print(f"Error retrieving students: {e}")

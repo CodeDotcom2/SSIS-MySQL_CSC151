@@ -73,29 +73,7 @@ def create_tables():
             print(f"Error creating tables: {e}")
         finally:
             connection.close()
-def create_default_na_programs():
-    """Ensures every college has an 'N/A' program (single-query version)."""
-    connection = create_connection()
-    if connection:
-        try:
-            cursor = connection.cursor()
-            cursor.execute("""
-                INSERT INTO programs (name, code, college_id)
-                SELECT 'N/A (Deleted Program)', 'N/A', c.id 
-                FROM colleges c
-                LEFT JOIN programs p ON c.id = p.college_id AND p.code = 'N/A'
-                WHERE p.id IS NULL
-            """)
-            connection.commit()
-            print(f"✅ Created {cursor.rowcount} default 'N/A' programs.")
-            return True
-        except Error as e:
-            print(f"❌ Error creating default N/A programs: {e}")
-            connection.rollback()
-            return False
-        finally:
-            connection.close()
-    return False
+
 # Student operations
 def save_student(first_name, last_name, id_number, year_level, gender, program_id):
     connection = create_connection()
@@ -194,8 +172,8 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
             # Get total count with search filter if provided
             count_query = """
                 SELECT COUNT(*) as count FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN programs p ON s.program_id = p.id
+                LEFT JOIN colleges c ON p.college_id = c.id
             """
             
             params = []
@@ -204,8 +182,8 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
                     s.first_name LIKE %s OR 
                     s.last_name LIKE %s OR 
                     s.id_number LIKE %s OR 
-                    p.name LIKE %s OR 
-                    c.name LIKE %s
+                    COALESCE(p.name, 'N/A') LIKE %s OR 
+                    COALESCE(c.name, 'N/A') LIKE %s
                 """
                 search_pattern = f"%{search_term}%"
                 params = [search_pattern, search_pattern, search_pattern, search_pattern, search_pattern]
@@ -216,12 +194,29 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
             
             # Get paginated results
             query = """
-                SELECT s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
-                       p.id as program_id, p.name as program_name, p.code as program_code,
-                       c.id as college_id, c.name as college_name, c.code as college_code
+                SELECT 
+                    s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
+                    s.program_id,
+                    COALESCE(p.name, 'N/A') as program_name, 
+                    COALESCE(p.code, 'N/A') as program_code,
+                    COALESCE(c.id, 
+                        (SELECT p2.college_id FROM programs p2 WHERE p2.id = s.program_id LIMIT 1)
+                    ) as college_id,
+                    COALESCE(c.name,
+                        (SELECT c2.name FROM programs p2 
+                        JOIN colleges c2 ON p2.college_id = c2.id 
+                        WHERE p2.id = s.program_id LIMIT 1),
+                        'N/A'
+                    ) as college_name,
+                    COALESCE(c.code,
+                        (SELECT c2.code FROM programs p2 
+                        JOIN colleges c2 ON p2.college_id = c2.id 
+                        WHERE p2.id = s.program_id LIMIT 1),
+                        'N/A'
+                    ) as college_code
                 FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
+                LEFT JOIN programs p ON s.program_id = p.id
+                LEFT JOIN colleges c ON p.college_id = c.id
             """
             
             if search_term:
@@ -229,8 +224,8 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
                     s.first_name LIKE %s OR 
                     s.last_name LIKE %s OR 
                     s.id_number LIKE %s OR 
-                    p.name LIKE %s OR 
-                    c.name LIKE %s
+                    COALESCE(p.name, 'N/A') LIKE %s OR 
+                    COALESCE(c.name, 'N/A') LIKE %s
                 """
             
             query += " ORDER BY s.last_name, s.first_name"
@@ -269,9 +264,21 @@ def get_student_by_id(student_id):
                        s.program_id,
                        COALESCE(p.name, 'N/A') as program_name,
                        COALESCE(p.code, 'N/A') as program_code,
-                       p.college_id as college_id,
-                       COALESCE(c.name, 'N/A') as college_name,
-                       COALESCE(c.code, 'N/A') as college_code
+                       COALESCE(c.id, 
+                           (SELECT p2.college_id FROM programs p2 WHERE p2.id = s.program_id LIMIT 1)
+                       ) as college_id,
+                       COALESCE(c.name,
+                           (SELECT c2.name FROM programs p2 
+                            JOIN colleges c2 ON p2.college_id = c2.id 
+                            WHERE p2.id = s.program_id LIMIT 1),
+                           'N/A'
+                       ) as college_name,
+                       COALESCE(c.code,
+                           (SELECT c2.code FROM programs p2 
+                            JOIN colleges c2 ON p2.college_id = c2.id 
+                            WHERE p2.id = s.program_id LIMIT 1),
+                           'N/A'
+                       ) as college_code
                 FROM students s
                 LEFT JOIN programs p ON s.program_id = p.id
                 LEFT JOIN colleges c ON p.college_id = c.id
@@ -327,19 +334,20 @@ def delete_college(college_id):
     if connection is not None:
         try:
             cursor = connection.cursor()
+            # Check if college has associated programs
+            cursor.execute("SELECT COUNT(*) FROM programs WHERE college_id = %s", (college_id,))
+            program_count = cursor.fetchone()[0]
+            if program_count > 0:
+                return False, "Cannot delete college that has programs"
             
-            cursor.execute("DELETE FROM programs WHERE college_id = %s", (college_id,))
-            
+            # Delete the college
             cursor.execute("DELETE FROM colleges WHERE id = %s", (college_id,))
-            
             connection.commit()
-            
             if cursor.rowcount > 0:
-                return True, "College and all its programs deleted successfully"
+                return True, "College deleted successfully"
             else:
                 return False, "College not found"
         except Error as e:
-            connection.rollback()
             print(f"Error deleting college: {e}")
             return False, f"Error: {str(e)}"
         finally:
@@ -401,22 +409,18 @@ def save_program(name, code, college_id):
             connection.close()
     return False, "Database connection failed"
 
-def get_all_programs(include_deleted=False):
+def get_all_programs():
     connection = create_connection()
     programs = []
     if connection is not None:
         try:
             cursor = connection.cursor(dictionary=True)
-            query = """
+            cursor.execute("""
                 SELECT p.id, p.name, p.code, p.college_id, c.name as college_name, c.code as college_code 
                 FROM programs p
                 JOIN colleges c ON p.college_id = c.id
-            """
-            if not include_deleted:
-                query += " WHERE p.name != 'N/A (Deleted)'"
-            query += " ORDER BY p.name"
-            
-            cursor.execute(query)
+                ORDER BY p.name
+            """)
             programs = cursor.fetchall()
         except Error as e:
             print(f"Error retrieving programs: {e}")
@@ -483,20 +487,19 @@ def delete_program(program_id):
         try:
             cursor = connection.cursor()
             
-            # Instead of deleting, update the program to mark it as "N/A"
-            cursor.execute("""
-                UPDATE programs 
-                SET name = 'N/A (Deleted)', code = 'N/A'
-                WHERE id = %s
-            """, (program_id,))
+            # Instead of preventing deletion, update students to have NULL program_id
+            cursor.execute("UPDATE students SET program_id = NULL WHERE program_id = %s", (program_id,))
             
+            # Now delete the program
+            cursor.execute("DELETE FROM programs WHERE id = %s", (program_id,))
             connection.commit()
+            
             if cursor.rowcount > 0:
-                return True, "Program marked as deleted successfully"
+                return True, "Program deleted successfully. Any enrolled students have been updated."
             else:
                 return False, "Program not found"
         except Error as e:
-            print(f"Error updating program: {e}")
+            print(f"Error deleting program: {e}")
             return False, f"Error: {str(e)}"
         finally:
             connection.close()

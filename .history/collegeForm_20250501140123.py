@@ -202,9 +202,9 @@ def view_colleges_form(root, body_frame=None):
             success, message = delete_college(college_id)
             if success:
                 messagebox.showinfo("Success", message)
-                load_colleges()  
+                load_colleges()  # Refresh the list
                 from body import refresh_students
-                refresh_students()  
+                refresh_students()  # Refresh student list to show N/A values
             else:
                 messagebox.showerror("Error", message)
     

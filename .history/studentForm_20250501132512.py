@@ -280,6 +280,17 @@ def create_form(root, body_frame=None, mode="add", student_data=None, refresh_ca
             if program_text in program_dict:
                 text_elements['program_dropdown'].set(program_text)
 
+        # Ensure college is displayed correctly even if program is NULL
+        college_found = False
+        for display_text, college_id in college_dict.items():
+            if college_id == student_data['college_id']:
+                text_elements['college_dropdown'].set(display_text)
+                college_found = True
+                break
+
+        if not college_found:
+            text_elements['college_dropdown'].set("No College Assigned")
+
     form_frame.college_dict = college_dict
     form_frame.program_dict = program_dict
     form_frame.text_elements = text_elements

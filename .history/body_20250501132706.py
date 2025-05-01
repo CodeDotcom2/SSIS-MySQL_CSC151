@@ -290,19 +290,19 @@ def load_students(search_term=None):
     for student in students:
         year_mapping = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th", 5: "5+"}
         year_level = year_mapping.get(student['year_level'], "")
-        
-        # Program will be "N/A" if deleted, but college remains
+
         program_display = student['program_code']
-        college_display = student['college_code']  # Will only be "N/A" if college was deleted
-        
+        college_display = student['college_code']
+        full_name = f"{student['last_name']}, {student['first_name']}"
+
         student_table.insert('', 'end', values=(
             student['id'],
             student['id_number'],
-            f"{student['last_name']}, {student['first_name']}",
+            full_name,
             student['gender'],
             year_level,
-            college_display,  # Shows original college even if program is deleted
-            program_display   # Shows "N/A" if program is deleted
+            college_display,
+            program_display
         ))
 
     if search_term:

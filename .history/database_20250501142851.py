@@ -191,63 +191,52 @@ def get_all_students(page=1, items_per_page=10, search_term=None):
         try:
             cursor = connection.cursor(dictionary=True)
             
-            # Get total count with search filter if provided
+            # Base count query
             count_query = """
-                SELECT COUNT(*) as count FROM students s
+                SELECT COUNT(*) as count 
+                FROM students s
+                JOIN programs p ON s.program_id = p.id
+                JOIN colleges c ON p.college_id = c.id
+            """
+            
+            # Base select query
+            query = """
+                SELECT 
+                    s.id, s.first_name, s.last_name, s.id_number, 
+                    s.year_level, s.gender,
+                    p.id as program_id, p.name as program_name, 
+                    p.code as program_code,
+                    c.id as college_id, c.name as college_name, 
+                    c.code as college_code
+                FROM students s
                 JOIN programs p ON s.program_id = p.id
                 JOIN colleges c ON p.college_id = c.id
             """
             
             params = []
             if search_term:
-                count_query += """ WHERE 
-                    s.first_name LIKE %s OR 
+                where_clause = """
+                    WHERE s.first_name LIKE %s OR 
                     s.last_name LIKE %s OR 
                     s.id_number LIKE %s OR 
                     p.name LIKE %s OR 
                     c.name LIKE %s
                 """
+                count_query += where_clause
+                query += where_clause
                 search_pattern = f"%{search_term}%"
-                params = [search_pattern, search_pattern, search_pattern, search_pattern, search_pattern]
+                params = [search_pattern]*5
             
+            # Get total count
             cursor.execute(count_query, params)
-            result = cursor.fetchone()
-            total_count = result['count'] if result else 0
+            total_count = cursor.fetchone()['count']
             
             # Get paginated results
-            query = """
-                SELECT s.id, s.first_name, s.last_name, s.id_number, s.year_level, s.gender,
-                       p.id as program_id, p.name as program_name, p.code as program_code,
-                       c.id as college_id, c.name as college_name, c.code as college_code
-                FROM students s
-                JOIN programs p ON s.program_id = p.id
-                JOIN colleges c ON p.college_id = c.id
-            """
-            
-            if search_term:
-                query += """ WHERE 
-                    s.first_name LIKE %s OR 
-                    s.last_name LIKE %s OR 
-                    s.id_number LIKE %s OR 
-                    p.name LIKE %s OR 
-                    c.name LIKE %s
-                """
-            
             query += " ORDER BY s.last_name, s.first_name"
             query += " LIMIT %s OFFSET %s"
+            params.extend([items_per_page, (page-1)*items_per_page])
             
-            offset = (page - 1) * items_per_page
-            
-            if search_term:
-                search_pattern = f"%{search_term}%"
-                cursor.execute(
-                    query, 
-                    [search_pattern, search_pattern, search_pattern, search_pattern, search_pattern, 
-                     items_per_page, offset]
-                )
-            else:
-                cursor.execute(query, [items_per_page, offset])
-                
+            cursor.execute(query, params)
             students = cursor.fetchall()
             
         except Error as e:
@@ -481,22 +470,39 @@ def delete_program(program_id):
     connection = create_connection()
     if connection is not None:
         try:
-            cursor = connection.cursor()
+            cursor = connection.cursor(dictionary=True)
             
-            # Instead of deleting, update the program to mark it as "N/A"
+            cursor.execute("SELECT college_id FROM programs WHERE id = %s", (program_id,))
+            program = cursor.fetchone()
+            if not program:
+                return False, "Program not found"
+            
+            college_id = program['college_id']
+            
             cursor.execute("""
-                UPDATE programs 
-                SET name = 'N/A (Deleted)', code = 'N/A'
-                WHERE id = %s
-            """, (program_id,))
+                SELECT id FROM programs 
+                WHERE college_id = %s AND code = 'N/A'
+            """, (college_id,))
+            na_program = cursor.fetchone()
+            
+            if not na_program:
+                return False, "Default N/A program not found for this college"
+            
+            na_program_id = na_program['id']
+            
+            cursor.execute("""
+                UPDATE students 
+                SET program_id = %s 
+                WHERE program_id = %s
+            """, (na_program_id, program_id))
+            
+            cursor.execute("DELETE FROM programs WHERE id = %s", (program_id,))
             
             connection.commit()
-            if cursor.rowcount > 0:
-                return True, "Program marked as deleted successfully"
-            else:
-                return False, "Program not found"
+            return True, "Program deleted successfully (students reassigned to N/A)"
+            
         except Error as e:
-            print(f"Error updating program: {e}")
+            connection.rollback()
             return False, f"Error: {str(e)}"
         finally:
             connection.close()
