@@ -12,7 +12,6 @@ def main():
     root = Tk()
     root.title(" ")
     root.geometry("1200x700")
-    root.minsize(900, 600)
     icon = PhotoImage(file="Images/icon.png")
     root.iconphoto(True, icon)
     
