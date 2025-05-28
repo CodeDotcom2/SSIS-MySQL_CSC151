@@ -426,7 +426,7 @@ def update_college(college_id, name, code):
     return False, "Database connection failed"
 
 def is_college_referenced(college_id):
-    #Check if college has any students through its programs
+    """Check if college has any students through its programs"""
     connection = create_connection()
     if connection is not None:
         try:

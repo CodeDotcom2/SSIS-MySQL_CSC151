@@ -98,18 +98,18 @@ def sort_function(body_frame):
     )
     desc_rb.pack(side=LEFT)
 
-    # Button canvas 
+    # Create button canvas positioned higher with 15px from bottom
     button_canvas = Canvas(sort_canvas, bg="#E8E8E8", width=230, height=50, highlightthickness=0)
     sort_canvas.create_window(250/2, 270 - 40, window=button_canvas)  # 50/2 + 15 = 40 from bottom
 
     # Button dimensions and positions
-    button_width = 100  
+    button_width = 100  # Both buttons will now use the same width
     button_height = 40
     gap = 10
     total_width = (button_width * 2) + gap
     start_x = (230 - total_width) / 2
 
-    # Create rounded rectangle buttons 
+    # Create rounded rectangle buttons (now both using the same width)
     apply_bg = create_rounded_rectangle(button_canvas, 
                                       start_x, 5, 
                                       start_x + button_width, 45, 
@@ -126,7 +126,7 @@ def sort_function(body_frame):
     cancel = button_canvas.create_text(start_x + button_width + gap + button_width/2, 25, 
                             text="Cancel", font=("Albert Sans", 12,"bold"), fill="white")
 
-    # Button bind
+    # Add button click functionality
     button_canvas.tag_bind(apply_bg, "<Button-1>", lambda e: apply_sort(sort_field.get(), sort_direction.get()))
     button_canvas.tag_bind(apply, "<Button-1>", lambda e: apply_sort(sort_field.get(), sort_direction.get()))
     button_canvas.tag_bind(cancel_bg, "<Button-1>", lambda e: toggle_visibility())
@@ -184,10 +184,16 @@ def apply_sort(field, direction):
     toggle_visibility()
 
 def get_current_sort():
+    """
+    Get the current sort field and direction
+    """
     global current_sort_field, current_sort_direction
     return current_sort_field, current_sort_direction
 
 def set_sort_button_reference(button_obj, button_canvas):
+    """
+    Set the reference to the sort button from header.py
+    """
     global sort_button, sort_button_canvas
     sort_button = button_obj
     sort_button_canvas = button_canvas

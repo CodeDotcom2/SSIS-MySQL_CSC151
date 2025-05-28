@@ -184,10 +184,16 @@ def apply_sort(field, direction):
     toggle_visibility()
 
 def get_current_sort():
+    """
+    Get the current sort field and direction
+    """
     global current_sort_field, current_sort_direction
     return current_sort_field, current_sort_direction
 
 def set_sort_button_reference(button_obj, button_canvas):
+    """
+    Set the reference to the sort button from header.py
+    """
     global sort_button, sort_button_canvas
     sort_button = button_obj
     sort_button_canvas = button_canvas

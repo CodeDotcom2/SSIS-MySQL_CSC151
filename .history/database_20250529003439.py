@@ -425,23 +425,6 @@ def update_college(college_id, name, code):
             connection.close()
     return False, "Database connection failed"
 
-def is_college_referenced(college_id):
-    #Check if college has any students through its programs
-    connection = create_connection()
-    if connection is not None:
-        try:
-            cursor = connection.cursor()
-            cursor.execute("""
-                SELECT EXISTS (
-                    SELECT 1 FROM students s
-                    JOIN programs p ON s.program_id = p.id
-                    WHERE p.college_id = %s
-                ) as is_referenced
-            """, (college_id,))
-            return cursor.fetchone()[0]
-        finally:
-            connection.close()
-    return True  # Assume referenced if connection fails
 
 #Program operations
 def save_program(name, code, college_id):

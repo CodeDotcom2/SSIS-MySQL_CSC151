@@ -474,7 +474,7 @@ def add_college_form(root, body_frame=None, edit_mode=False, college_id=None, co
             success, message = save_college(college_name, code)
             if success:
                 messagebox.showinfo("Success", message)
-                
+                # Clear the form
                 add_name.delete(0, END)
                 add_name.insert(0, "Ex: College of Computer Studies")
                 add_name.config(fg="gray", justify="center")
