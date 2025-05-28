@@ -236,8 +236,7 @@ def add_program_form(root, body_frame=None, edit_mode=False, program_id=None, pr
     save_canvas.tag_bind(save_text, "<Button-1>", lambda event: submit_form())
 
     def close_form():
-        if side_bar_canvas:
-            side_bar_canvas.config(bg=side_bar_canvas.original_color)
+        
         form_frame3.destroy()
 
     def close_hover(event):

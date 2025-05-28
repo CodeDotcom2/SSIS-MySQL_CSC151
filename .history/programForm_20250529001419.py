@@ -6,14 +6,11 @@ import re
 
 def add_program_form(root, body_frame=None, edit_mode=False, program_id=None, program_name=None, program_code=None, college_id=None):
     from database import get_all_colleges, update_program, save_program
-    from side import side_bar_canvas
     global back_icon
     
     if body_frame is None:
         from body import body
         body_frame = body(root)
-    if side_bar_canvas:
-        side_bar_canvas.config(bg="lightgray")
 
     form_frame3 = Canvas(body_frame, bg="white", width=350, height=350, bd=0, highlightthickness=0)
     form = create_rounded_rectangle(form_frame3, -300, 0, 350, 350, radius=130, fill='lightgray')
@@ -236,8 +233,6 @@ def add_program_form(root, body_frame=None, edit_mode=False, program_id=None, pr
     save_canvas.tag_bind(save_text, "<Button-1>", lambda event: submit_form())
 
     def close_form():
-        if side_bar_canvas:
-            side_bar_canvas.config(bg=side_bar_canvas.original_color)
         form_frame3.destroy()
 
     def close_hover(event):
@@ -568,7 +563,8 @@ def view_programs_form(root, body_frame=None):
                     widget.configure(foreground="black")
             
             edit_form.place(x=0, y=0)
-            
+            if side_bar_canvas:
+                side_bar_canvas.config(bg=side_bar_canvas.original_color)
     
     def delete_selected():
         selected_item = program_table.selection()
