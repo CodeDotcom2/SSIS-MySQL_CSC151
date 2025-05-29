@@ -70,10 +70,9 @@ def save_student(first_name, last_name, id_number, year_level, gender, program_i
             if cursor.fetchone():
                 return False, "Student ID number already exists"
             
-            cursor.execute("SELECT id FROM students WHERE first_name = %s AND last_name = %s", 
-                         (first_name, last_name))
+            cursor.execute("SELECT id FROM students WHERE last_name = %s",(last_name,))
             if cursor.fetchone():
-                return False, "Student with this name already exists"
+                return False, "Student already exists"
             
             year_mapping = {"1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5+": 5}
             year_level_int = year_mapping.get(year_level, 1)
@@ -104,10 +103,9 @@ def update_student(student_id, first_name, last_name, id_number, year_level, gen
             if cursor.fetchone():
                 return False, "Student ID number already exists"
             
-            cursor.execute("SELECT id FROM students WHERE first_name = %s AND last_name = %s", 
-                         (first_name, last_name))
+            cursor.execute("SELECT id FROM students WHERE last_name = %s",(last_name,))
             if cursor.fetchone():
-                return False, "Student with this name already exists"
+                return False, "Student already exists"
 
             year_mapping = {"1st": 1, "2nd": 2, "3rd": 3, "4th": 4, "5+": 5}
             year_level_int = year_mapping.get(year_level, 1)
